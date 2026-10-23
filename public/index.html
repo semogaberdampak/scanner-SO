@@ -533,10 +533,10 @@
 
     try {
       // Cabang, role, user, nama & harga ditentukan server dari sesi dan sheet Master
-      await api('simpan', { produk_id: activeItem.produk_id, qty: qtyVal });
+      const res = await api('simpan', { produk_id: activeItem.produk_id, qty: qtyVal });
       document.getElementById('inputQty').value = 1;
       resumeScanner();
-      showModal("Berhasil Disimpan", `Berhasil mencatat (${currentUser.role}) ${qtyVal} Pcs ${activeItem.nama_produk} ke Sheet ${currentUser.cabang.toUpperCase()}!`);
+      showModal("Berhasil Disimpan", `Tercatat (${currentUser.role}) +${qtyVal} Pcs ${activeItem.nama_produk} di ${currentUser.cabang.toUpperCase()}. Total input ${currentUser.role.toLowerCase()} untuk produk ini: ${res.total} Pcs.`);
     } catch (err) {
       if (handleAuthError(err)) return;
       showModal("Gagal Menyimpan", err.message);
@@ -546,46 +546,73 @@
     }
   }
 
+  // ---------- Rekap: file Excel dengan baris abu-abu muda jika selisih kasir vs verifikator != 0 ----------
+  function loadScriptOnce(src) {
+    return new Promise((resolve, reject) => {
+      if (window.ExcelJS) return resolve();
+      const el = document.createElement('script');
+      el.src = src;
+      el.onload = resolve;
+      el.onerror = () => reject(new Error('Pustaka Excel gagal dimuat. Periksa koneksi internet.'));
+      document.head.appendChild(el);
+    });
+  }
+
+  async function buildRekapBuffer(rows, cabang) {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet(('Rekap ' + cabang).slice(0, 31));
+    ws.columns = [
+      { header: 'produk_id', width: 16 },
+      { header: 'nama_produk', width: 56 },
+      { header: 'harga', width: 12 },
+      { header: 'qty_kasir', width: 12 },
+      { header: 'qty_verifikator', width: 16 },
+      { header: 'selisih', width: 10 }
+    ];
+    ws.getRow(1).font = { bold: true };
+    ws.views = [{ state: 'frozen', ySplit: 1 }];
+
+    rows.forEach((p, i) => {
+      const n = i + 2;
+      const selisih = p.qty_kasir - p.qty_verifikator;           // kolom D dikurangi kolom E
+      const harga = Number(p.harga);
+      const row = ws.addRow([
+        String(p.produk_id),
+        p.nama_produk,
+        isNaN(harga) ? p.harga : harga,
+        p.qty_kasir,
+        p.qty_verifikator,
+        { formula: `D${n}-E${n}`, result: selisih }
+      ]);
+      if (selisih !== 0) {                                       // minus atau plus: kolom A-F abu-abu muda
+        for (let c = 1; c <= 6; c++) {
+          row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
+        }
+      }
+    });
+    return wb.xlsx.writeBuffer();
+  }
+
   async function downloadDataRekap() {
     const targetCabang = (currentUser.role === 'ADMIN') ? document.getElementById('exportBranchSelect').value : currentUser.cabang;
 
     try {
       const res = await api('rekap', { cabang: targetCabang });
-      const rawRows = res.data;
-      if (!rawRows || rawRows.length === 0) {
+      if (!res.data || res.data.length === 0) {
         return showModal("Informasi", `Belum ada data transaksi di Sheet ${targetCabang.toUpperCase()}`);
       }
-
-      let rekapMap = {};
-      rawRows.forEach(item => {
-        if (!rekapMap[item.produk_id]) {
-          rekapMap[item.produk_id] = {
-            produk_id: item.produk_id,
-            nama_produk: item.nama_produk,
-            harga: item.harga,
-            qty_kasir: 0,
-            qty_verifikator: 0
-          };
-        }
-        if (item.role === 'KASIR') {
-          rekapMap[item.produk_id].qty_kasir += item.qty;
-        } else if (item.role === 'VERIFIKATOR') {
-          rekapMap[item.produk_id].qty_verifikator += item.qty;
-        }
-      });
-
-      let csvLines = [];
-      csvLines.push('"produk_id","nama_produk","harga","qty_kasir","qty_verifikator","selisih"');
-
-      Object.values(rekapMap).forEach(p => {
-        const selisih = p.qty_kasir - p.qty_verifikator;
-        csvLines.push(`"${p.produk_id}","${String(p.nama_produk).replace(/"/g, '""')}",${p.harga},${p.qty_kasir},${p.qty_verifikator},${selisih}`);
-      });
-
-      exportCSVFile("\ufeff" + csvLines.join("\n"), `Rekap_Perbandingan_${targetCabang.toUpperCase()}_${new Date().toISOString().slice(0,10)}.csv`);
+      await loadScriptOnce('vendor/exceljs.min.js');
+      const buf = await buildRekapBuffer(res.data, targetCabang.toUpperCase());
+      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `Rekap_Perbandingan_${targetCabang.toUpperCase()}_${new Date().toISOString().slice(0,10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
     } catch (err) {
       if (handleAuthError(err)) return;
-      showModal("Gagal", "Gagal mengambil data rekap: " + err.message);
+      showModal("Gagal", "Gagal membuat rekap: " + err.message);
     }
   }
 

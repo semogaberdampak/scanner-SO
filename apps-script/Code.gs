@@ -18,6 +18,21 @@ var SESSION_SECONDS = 6 * 60 * 60;   // 6 jam (batas maksimum CacheService)
 var CABANG_VALID = ['kranggan', 'katedral', 'santamaria', 'athanasius', 'antonius', 'paulus'];
 var ROLE_VALID = ['KASIR', 'VERIFIKATOR'];
 
+// Format sheet tiap cabang: SATU BARIS PER PRODUK (kolom A-G)
+var HEADER = ['kode_produk', 'nama_produk', 'harga', 'input_kasir', 'timestamp_kasir', 'input_verifikator', 'timestamp_verifikator'];
+var COL_KASIR = 4;        // D (timestamp di E)
+var COL_VERIFIKATOR = 6;  // F (timestamp di G)
+var FORMAT_WAKTU = 'dd/MM/yyyy HH:mm:ss';
+
+// true = judul sudah ada; false = sheet kosong (judul akan dibuat); lempar error jika isinya format lain
+function cekFormatSheet_(sheet) {
+  if (sheet.getLastRow() === 0) return false;
+  var a1 = String(sheet.getRange(1, 1).getValue()).trim().toLowerCase();
+  if (a1 === HEADER[0]) return true;
+  throw new Error('Format sheet "' + sheet.getName() + '" tidak sesuai. Baris 1 harus berisi judul: ' +
+                  HEADER.join(', ') + '. Kosongkan data uji lama di sheet itu lalu coba lagi.');
+}
+
 // ===== ENTRY POINT =====
 function doGet() {
   return json_({ ok: true, service: 'System Scan & Stock API' });
@@ -101,47 +116,82 @@ function master_(user) {
 }
 
 function simpan_(user, b) {
+  if (user.role !== 'KASIR' && user.role !== 'VERIFIKATOR')
+    return { ok: false, error: 'Akun Super User tidak bisa mencatat input. Login sebagai Kasir atau Verifikator.' };
+
   var qty = parseInt(b.qty, 10);
   if (!(qty >= 1 && qty <= 100000)) return { ok: false, error: 'Jumlah tidak valid.' };
 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  // Kunci: kasir & verifikator yang menyimpan bersamaan diproses bergantian, tidak saling menimpa
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // Nama & harga diambil dari sheet Master (bukan dari klien) agar tidak bisa dimanipulasi
-  var master = ss.getSheetByName('Master');
-  if (!master) return { ok: false, error: 'Sheet Master tidak ditemukan.' };
-  var found = master.getRange('A:A').createTextFinder(String(b.produk_id)).matchEntireCell(true).findNext();
-  if (!found) return { ok: false, error: 'Produk tidak ditemukan di Master.' };
-  var row = master.getRange(found.getRow(), 1, 1, 4).getValues()[0];
+    // Nama & harga diambil dari sheet Master (bukan dari klien)
+    var master = ss.getSheetByName('Master');
+    if (!master) return { ok: false, error: 'Sheet Master tidak ditemukan.' };
+    var mf = master.getRange('A:A').createTextFinder(String(b.produk_id)).matchEntireCell(true).findNext();
+    if (!mf) return { ok: false, error: 'Produk tidak ditemukan di Master.' };
+    var m = master.getRange(mf.getRow(), 1, 1, 4).getValues()[0];
 
-  var sheetName = user.cabang;
-  var sheet = ss.getSheetByName(sheetName);
-  if (!sheet) {
-    sheet = ss.insertSheet(sheetName);
-    sheet.appendRow(['Timestamp', 'Produk ID', 'Nama Produk', 'Harga', 'Role', 'Qty', 'User']);
+    var sheet = ss.getSheetByName(user.cabang);
+    if (!sheet) sheet = ss.insertSheet(user.cabang);
+    if (!cekFormatSheet_(sheet)) sheet.appendRow(HEADER);
+
+    var kolom = user.role === 'KASIR' ? COL_KASIR : COL_VERIFIKATOR;
+    var now = new Date();
+    var kode = String(m[0]).trim();
+    var total;
+
+    var f = sheet.getRange('A:A').createTextFinder(kode).matchEntireCell(true).findNext();
+    if (f && f.getRow() > 1) {
+      // Produk sudah ada di sheet: tambahkan ke jumlah peran ini, perbarui waktunya
+      var row = f.getRow();
+      total = (Number(sheet.getRange(row, kolom).getValue()) || 0) + qty;
+      sheet.getRange(row, kolom, 1, 2).setValues([[total, now]]);
+      sheet.getRange(row, kolom + 1).setNumberFormat(FORMAT_WAKTU);
+    } else {
+      // Produk baru di sheet cabang ini: buat satu baris baru
+      var baru = sheet.getLastRow() + 1;
+      sheet.getRange(baru, 1).setNumberFormat('@');
+      var data = [kode, m[2], m[3], '', '', '', ''];
+      data[kolom - 1] = qty;
+      data[kolom] = now;
+      sheet.getRange(baru, 1, 1, HEADER.length).setValues([data]);
+      sheet.getRange(baru, kolom + 1).setNumberFormat(FORMAT_WAKTU);
+      total = qty;
+    }
+
+    return {
+      ok: true,
+      total: total,
+      message: 'Tersimpan di sheet ' + user.cabang + ' (' + user.role + ')'
+    };
+  } finally {
+    lock.releaseLock();
   }
-
-  sheet.appendRow([new Date(), String(row[0]).trim(), row[2], row[3], user.role, qty, user.username]);
-  return { ok: true, message: 'Data berhasil disimpan ke sheet ' + sheetName };
 }
 
 function rekap_(user, b) {
   // Admin boleh memilih cabang; selain admin hanya cabangnya sendiri
   var target = user.role === 'ADMIN' ? String(b.cabang || '').toLowerCase().trim() : user.cabang;
-  if (CABANG_VALID.indexOf(target) < 0 && target !== 'admin') return { ok: false, error: 'Cabang tidak valid.' };
+  if (CABANG_VALID.indexOf(target) < 0) return { ok: false, error: 'Cabang tidak valid.' };
 
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(target);
-  if (!sheet) return { ok: true, data: [], cabang: target };
+  if (!sheet || !cekFormatSheet_(sheet)) return { ok: true, data: [], cabang: target };
 
   var rows = sheet.getDataRange().getValues();
   var out = [];
   for (var i = 1; i < rows.length; i++) {
     var r = rows[i];
+    if (!r[0]) continue;
     out.push({
-      produk_id: String(r[1]).trim(),
-      nama_produk: r[2],
-      harga: r[3],
-      role: String(r[4]).toUpperCase().trim(),
-      qty: Number(r[5]) || 0
+      produk_id: String(r[0]).trim(),
+      nama_produk: r[1],
+      harga: r[2],
+      qty_kasir: Number(r[3]) || 0,
+      qty_verifikator: Number(r[5]) || 0
     });
   }
   return { ok: true, data: out, cabang: target };
