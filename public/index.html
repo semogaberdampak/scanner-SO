@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#1a73e8">
+<<<<<<< HEAD
+  <script>
+    // Terapkan tema tersimpan sedini mungkin agar tidak berkedip
+    (function () {
+      try {
+        if (localStorage.getItem('scanstock.theme') === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
+=======
+>>>>>>> 5416602babdfc5c7a6653977cb5275f65fe89843
+  <title>POS & Stock Entry System</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Scan Stock">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <script src="vendor/html5-qrcode.min.js"></script>
+  <script src="config.js"></script>
+  <style>
+    :root {
+      --bg-primary: #f4f6f9;
+      --bg-card: #ffffff;
+      --text-main: #202124;
+      --text-muted: #5f6368;
+      --accent: #1a73e8;
+      --accent-hover: #1557b0;
+      --btn-secondary-bg: #e8f0fe;
+      --btn-secondary-text: #1a73e8;
+      --border-color: #dadce0;
+      --card-bg-sub: #f8f9fa;
+      --modal-overlay: rgba(0, 0, 0, 0.5);
+      --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    [data-theme="dark"] {
+      --bg-primary: #121212;
+      --bg-card: #1e1e1e;
+      --text-main: #e8eaed;
+      --text-muted: #9aa0a6;
+      --accent: #8ab4f8;
+      --accent-hover: #aecbfa;
+      --btn-secondary-bg: #2d3748;
+      --btn-secondary-text: #8ab4f8;
+      --border-color: #3c4043;
+      --card-bg-sub: #282a2d;
+      --modal-overlay: rgba(0, 0, 0, 0.75);
+    }
+
+    * { 
+      box-sizing: border-box; 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100%;
+      -webkit-text-size-adjust: 100%;
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      overflow-x: hidden;
+    }
+
+    body {
+      padding: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px)) calc(12px + var(--safe-area-bottom)) calc(12px + env(safe-area-inset-left, 0px));
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    .container { 
+      width: 100%; 
+      max-width: 540px; 
+      background: var(--bg-card); 
+      padding: clamp(14px, 4vw, 24px); 
+      border-radius: 16px; 
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06); 
+      border: 1px solid var(--border-color);
+    }
+    
+    .header { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      margin-bottom: 12px; 
+    }
+    .header h2 { 
+      margin: 0; 
+      font-size: clamp(16px, 4.5vw, 20px); 
+      color: var(--accent); 
+      font-weight: 700;
+    }
+
+    .user-bar { 
+      display: flex; 
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: space-between; 
+      align-items: center; 
+      background: var(--card-bg-sub); 
+      padding: 10px 12px; 
+      border-radius: 10px; 
+      margin-bottom: 14px; 
+      font-size: 13px; 
+      border: 1px solid var(--border-color); 
+    }
+    .role-badge { 
+      font-weight: 700; 
+      color: var(--accent); 
+      text-transform: uppercase; 
+    }
+
+    .btn { 
+      min-height: 44px;
+      padding: 10px 16px; 
+      border: 1px solid transparent; 
+      border-radius: 10px; 
+      font-weight: 600; 
+      cursor: pointer; 
+      font-size: 14px; 
+      display: inline-flex; 
+      align-items: center; 
+      justify-content: center; 
+      gap: 6px; 
+      outline: none; 
+      user-select: none;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: var(--accent); color: #ffffff; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary { background: var(--btn-secondary-bg); color: var(--btn-secondary-text); border-color: var(--border-color); }
+
+    #reader { 
+      width: 100%; 
+      border-radius: 12px; 
+      overflow: hidden; 
+      margin-bottom: 14px; 
+      display: none; 
+      border: 1px solid var(--border-color); 
+      background: #000000;
+    }
+    
+    .input-group { 
+      display: flex; 
+      gap: 8px; 
+      margin-bottom: 14px; 
+    }
+    input[type="text"], input[type="number"], input[type="password"], select { 
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 12px; 
+      border: 1px solid var(--border-color); 
+      background: var(--bg-card); 
+      color: var(--text-main); 
+      border-radius: 10px; 
+      font-size: 16px; /* Mencegah Auto-Zoom di iOS Safari */
+      outline: none; 
+      -webkit-appearance: none;
+    }
+    input:focus, select:focus { border-color: var(--accent); }
+
+    /* Segmented Control untuk Pilihan Role */
+    .segmented-role {
+      display: flex;
+      background: var(--card-bg-sub);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+    .segmented-role label { flex: 1; cursor: pointer; user-select: none; }
+    .segmented-role input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+    .segmented-role span {
+      display: block;
+      text-align: center;
+      padding: 11px 0;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 8px;
+      color: var(--text-muted);
+    }
+    .segmented-role input[type="radio"]:checked + span {
+      background: var(--accent);
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+    }
+
+    .card-result { 
+      background: var(--card-bg-sub); 
+      border-left: 5px solid var(--accent); 
+      padding: 14px; 
+      border-radius: 12px; 
+      display: none; 
+      margin-top: 14px; 
+      border-top: 1px solid var(--border-color); 
+      border-right: 1px solid var(--border-color); 
+      border-bottom: 1px solid var(--border-color); 
+    }
+    .card-result.error { border-left-color: #ea4335; }
+    .prod-id { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; word-break: break-all; }
+    .prod-title { font-size: clamp(15px, 4vw, 17px); font-weight: 700; margin-bottom: 12px; color: var(--text-main); line-height: 1.3; }
+    
+    .price-qty-row { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      background: var(--bg-card); 
+      padding: 12px; 
+      border-radius: 10px; 
+      margin-bottom: 12px; 
+      border: 1px solid var(--border-color); 
+    }
+    .price-box { font-size: clamp(16px, 4.5vw, 19px); font-weight: 700; color: var(--accent); }
+
+    .entry-form { 
+      display: flex; 
+      gap: 8px; 
+      background: var(--bg-card); 
+      padding: 8px; 
+      border-radius: 10px; 
+      border: 1px solid var(--border-color); 
+    }
+    .status-text { font-size: 12px; text-align: center; color: var(--text-muted); margin-bottom: 10px; }
+
+    /* Modal Popup */
+    .modal-overlay { 
+      display: none; 
+      position: fixed; 
+      top: 0; left: 0; width: 100%; height: 100%; 
+      background: var(--modal-overlay); 
+      z-index: 2000; 
+      align-items: center; 
+      justify-content: center; 
+      padding: 16px;
+      backdrop-filter: blur(3px);
+    }
+    .modal-box { 
+      background: var(--bg-card); 
+      color: var(--text-main); 
+      padding: 20px; 
+      border-radius: 14px; 
+      max-width: 320px; 
+      width: 100%; 
+      text-align: center; 
+      box-shadow: 0 8px 30px rgba(0,0,0,0.25); 
+      border: 1px solid var(--border-color); 
+      animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes popIn {
+      from { transform: scale(0.85); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; color: var(--accent); }
+    .modal-box { max-height: 90vh; overflow-y: auto; }
+    .modal-body { font-size: 14px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.4; }
+
+    /* Kamera: video selalu mengikuti lebar kontainer */
+    #reader video { width: 100% !important; height: auto !important; max-height: 65vh; object-fit: cover; display: block; }
+    #reader canvas { max-width: 100%; }
+
+    /* Responsif */
+    .btn { white-space: nowrap; }
+    @media (min-width: 768px) {
+      body { padding-top: 24px; }
+      .container { max-width: 720px; }
+    }
+    @media (max-width: 380px) {
+      .container { border-radius: 12px; }
+      .price-qty-row { flex-wrap: wrap; gap: 6px; }
+      .entry-form { flex-wrap: wrap; }
+      .entry-form input, .entry-form .btn { flex: 1 1 100% !important; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h2>Scan & Stock System</h2>
+<<<<<<< HEAD
+    <button class="btn btn-secondary" style="min-height: 36px; padding: 4px 10px; font-size: 12px;" id="btnTheme" onclick="toggleTheme()">🌙 Dark</button>
+=======
+    <button class="btn btn-secondary" style="min-height: 36px; padding: 4px 10px; font-size: 12px;" onclick="toggleTheme()">🌙 Dark</button>
+>>>>>>> 5416602babdfc5c7a6653977cb5275f65fe89843
+  </div>
+
+  <div class="status-text" id="dbStatus">⏳ Memuat Master Produk...</div>
+
+  <div class="user-bar" id="userBar" style="display: none;">
+    <div>User: <strong id="currentUsername">-</strong> (<span class="role-badge" id="currentRole">-</span>)</div>
+    <div style="display: flex; gap: 6px; align-items: center;">
+      <select id="exportBranchSelect" style="display: none; width: auto; min-height: 34px; padding: 2px 6px; font-size: 12px;">
+        <option value="kranggan">Kranggan</option>
+        <option value="katedral">Katedral</option>
+        <option value="santamaria">Santa Maria</option>
+        <option value="athanasius">Athanasius</option>
+        <option value="antonius">Antonius</option>
+        <option value="paulus">Paulus</option>
+      </select>
+      <button class="btn btn-secondary" style="min-height: 34px; padding: 4px 10px; font-size: 12px;" onclick="downloadDataRekap()">📥 Rekap</button>
+      <button class="btn btn-secondary" style="min-height: 34px; padding: 4px 10px; font-size: 12px;" onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <div id="loginSection" style="display: flex; flex-direction: column; gap: 10px;">
+    <div style="font-size: 14px; font-weight: 600; text-align: center; color: var(--text-muted);">Pilih Cabang & Role Tugas</div>
+    
+    <select id="loginBranch">
+      <option value="kranggan">Cabang - Kranggan</option>
+      <option value="katedral">Cabang - Katedral</option>
+      <option value="santamaria">Cabang - Santa Maria</option>
+      <option value="athanasius">Cabang - Athanasius</option>
+      <option value="antonius">Cabang - Antonius</option>
+      <option value="paulus">Cabang - Paulus</option>
+      <option value="admin">Super User (Admin)</option>
+    </select>
+
+    <div class="segmented-role" id="roleSelectionBox">
+      <label>
+        <input type="radio" name="userRole" value="KASIR" checked>
+        <span>Kasir</span>
+      </label>
+      <label>
+        <input type="radio" name="userRole" value="VERIFIKATOR">
+        <span>Verifikator</span>
+      </label>
+    </div>
+
+    <input type="password" id="loginPass" placeholder="Masukkan PIN / Password" inputmode="numeric">
+    <button class="btn btn-primary" id="btnLogin" onclick="login()">Login</button>
+  </div>
+
+  <div id="appSection" style="display: none;">
+    <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+      <button class="btn btn-primary" style="flex: 1 1 140px;" onclick="startScanner()">📷 Buka Kamera</button>
+      <button class="btn btn-secondary" onclick="stopScanner()">Tutup</button>
+      <!-- Cadangan: buka aplikasi kamera bawaan HP lalu baca barcode dari foto -->
+      <label class="btn btn-secondary" style="cursor: pointer;">📸 Foto
+        <input type="file" id="photoInput" accept="image/*" capture="environment" hidden onchange="scanFromPhoto(this)">
+      </label>
+    </div>
+
+    <div id="reader"></div>
+    <div id="reader-file" style="display: none;"></div>
+
+    <form onsubmit="cariManual(event)" class="input-group">
+      <input type="text" id="barcodeInput" placeholder="Scan Barcode / Ketik Kode..." autofocus autocomplete="off">
+      <button type="submit" class="btn btn-primary" style="flex: 0 0 auto;">Cari</button>
+    </form>
+
+    <div id="resultCard" class="card-result">
+      <div class="prod-id" id="resId">-</div>
+      <div class="prod-title" id="resTitle">-</div>
+
+      <div class="price-qty-row">
+        <div>
+          <div style="font-size: 11px; color: var(--text-muted);">HARGA PRODUK</div>
+          <div class="price-box" id="resPrice">Rp 0</div>
+        </div>
+      </div>
+
+      <div class="entry-form" id="entryForm">
+        <input type="number" id="inputQty" placeholder="Jumlah Qty..." min="1" value="1" inputmode="numeric" pattern="[0-9]*" style="flex: 0.8;">
+        <button class="btn btn-primary" id="btnSimpan" style="flex: 1.2;" onclick="simpanInputQty()">Simpan Input</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="notifyModal">
+  <div class="modal-box">
+    <div class="modal-title" id="modalTitle">Berhasil</div>
+    <div class="modal-body" id="modalMessage">Data jumlah produk telah disimpan.</div>
+    <button class="btn btn-primary" style="width: 100%;" onclick="closeModal()">OK</button>
+  </div>
+</div>
+
+<script>
+  let productLookupMap = {};
+  let currentUser = null;
+  let activeItem = null;
+  let session = null; // { token, user }
+  const SESSION_KEY = 'scanstock.session.v1';
+
+  // ---------- API (Google Apps Script sebagai backend) ----------
+  // Content-Type text/plain sengaja dipakai agar tidak memicu preflight CORS.
+  async function api(action, payload) {
+    const url = (window.APP_CONFIG && window.APP_CONFIG.API_URL) || '';
+    if (!url || url.indexOf('GANTI_DENGAN') >= 0) {
+      throw Object.assign(new Error('API_URL belum diisi di config.js'), { code: 'CONFIG' });
+    }
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 30000);
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(Object.assign({ action: action, token: session ? session.token : null }, payload || {})),
+        signal: ctrl.signal
+      });
+      const data = await res.json();
+      if (!data.ok) throw Object.assign(new Error(data.error || 'Permintaan gagal.'), { code: data.code || 'SERVER' });
+      return data;
+    } catch (err) {
+      if (err.name === 'AbortError') throw Object.assign(new Error('Server terlalu lama merespons.'), { code: 'TIMEOUT' });
+      if (err instanceof TypeError) throw Object.assign(new Error('Tidak dapat terhubung ke server. Periksa koneksi internet.'), { code: 'NETWORK' });
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  function handleAuthError(err) {
+    if (err && err.code === 'AUTH') {
+      logout();
+      showModal("Sesi Berakhir", "Silakan login kembali.");
+      return true;
+    }
+    return false;
+  }
+
+  async function fetchMasterData() {
+    const status = document.getElementById('dbStatus');
+    status.innerText = "⏳ Memuat Master Produk...";
+    try {
+      const res = await api('master');
+      productLookupMap = {};
+      res.data.forEach(item => {
+        if (item.produk_id) {
+          productLookupMap[item.produk_id.trim()] = item;
+          if (item.isbn) productLookupMap[item.isbn.trim().replace(/[- ]/g, '')] = item;
+        }
+      });
+      status.innerText = "✅ Database Siap (" + res.data.length + " Produk Loaded)";
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      status.innerText = "❌ Gagal memuat data master: " + err.message;
+    }
+  }
+
+  async function login() {
+    const branchSelect = document.getElementById('loginBranch').value;
+    const selectedRole = document.querySelector('input[name="userRole"]:checked').value;
+    const pass = document.getElementById('loginPass').value;
+    if (!pass) return showModal("Peringatan", "Silahkan masukkan PIN / Password.");
+
+    const btnLogin = document.getElementById('btnLogin');
+    btnLogin.disabled = true;
+    btnLogin.innerText = "Memeriksa...";
+    try {
+      const res = await api('login', { cabang: branchSelect, role: selectedRole, pin: pass });
+      session = { token: res.token, user: res.user };
+      try { localStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch (e) {}
+      document.getElementById('loginPass').value = '';
+      prosesMasuk();
+    } catch (err) {
+      showModal(err.code === 'SERVER' ? "Login Gagal" : "Gagal Login", err.message);
+    } finally {
+      btnLogin.disabled = false;
+      btnLogin.innerText = "Login";
+    }
+  }
+
+  function prosesMasuk() {
+    currentUser = session.user;
+    document.getElementById('loginSection').style.display = 'none';
+    document.getElementById('appSection').style.display = 'block';
+    document.getElementById('userBar').style.display = 'flex';
+    document.getElementById('currentUsername').innerText = currentUser.username;
+    document.getElementById('currentRole').innerText = currentUser.role + " (" + currentUser.cabang.toUpperCase() + ")";
+    document.getElementById('exportBranchSelect').style.display = (currentUser.role === 'ADMIN') ? 'inline-block' : 'none';
+    fetchMasterData();
+  }
+
+  function logout() {
+    currentUser = null;
+    session = null;
+    productLookupMap = {};
+    activeItem = null;
+    try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+    document.getElementById('loginSection').style.display = 'flex';
+    document.getElementById('appSection').style.display = 'none';
+    document.getElementById('userBar').style.display = 'none';
+    document.getElementById('resultCard').style.display = 'none';
+    document.getElementById('dbStatus').innerText = "Silakan login untuk memuat data produk.";
+    stopScanner();
+  }
+
+  function lookupProduct(scannedCode) {
+    if (!scannedCode) return;
+    const cleanCode = String(scannedCode).trim().replace(/[- ]/g, '');
+    const card = document.getElementById('resultCard');
+    
+    let item = productLookupMap[cleanCode];
+    
+    if (item) {
+      activeItem = item;
+      document.getElementById('resId').innerText = "ID: " + item.produk_id + (item.isbn ? " | ISBN: " + item.isbn : "");
+      document.getElementById('resTitle').innerText = item.nama_produk;
+      document.getElementById('resPrice').innerText = "Rp " + Number(item.harga).toLocaleString('id-ID');
+      
+      card.className = "card-result";
+      card.style.display = "block";
+      if (!isScanning) document.getElementById('inputQty').focus();
+      card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else {
+      activeItem = null;
+      document.getElementById('resId').innerText = "Kode Di-scan: " + scannedCode;
+      document.getElementById('resTitle').innerText = "Produk Tidak Ditemukan";
+      document.getElementById('resPrice').innerText = "Rp 0";
+      card.className = "card-result error";
+      card.style.display = "block";
+    }
+  }
+
+  async function simpanInputQty() {
+    const qtyVal = parseInt(document.getElementById('inputQty').value) || 0;
+    if (!activeItem) return;
+    if (qtyVal <= 0) return showModal("Peringatan", "Jumlah produk harus lebih dari 0.");
+
+    const btn = document.getElementById('btnSimpan');
+    btn.innerText = "Simpan...";
+    btn.disabled = true;
+
+    try {
+      // Cabang, role, user, nama & harga ditentukan server dari sesi dan sheet Master
+      await api('simpan', { produk_id: activeItem.produk_id, qty: qtyVal });
+      document.getElementById('inputQty').value = 1;
+      resumeScanner();
+      showModal("Berhasil Disimpan", `Berhasil mencatat (${currentUser.role}) ${qtyVal} Pcs ${activeItem.nama_produk} ke Sheet ${currentUser.cabang.toUpperCase()}!`);
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      showModal("Gagal Menyimpan", err.message);
+    } finally {
+      btn.innerText = "Simpan Input";
+      btn.disabled = false;
+    }
+  }
+
+  async function downloadDataRekap() {
+    const targetCabang = (currentUser.role === 'ADMIN') ? document.getElementById('exportBranchSelect').value : currentUser.cabang;
+
+    try {
+      const res = await api('rekap', { cabang: targetCabang });
+      const rawRows = res.data;
+      if (!rawRows || rawRows.length === 0) {
+        return showModal("Informasi", `Belum ada data transaksi di Sheet ${targetCabang.toUpperCase()}`);
+      }
+
+      let rekapMap = {};
+      rawRows.forEach(item => {
+        if (!rekapMap[item.produk_id]) {
+          rekapMap[item.produk_id] = {
+            produk_id: item.produk_id,
+            nama_produk: item.nama_produk,
+            harga: item.harga,
+            qty_kasir: 0,
+            qty_verifikator: 0
+          };
+        }
+        if (item.role === 'KASIR') {
+          rekapMap[item.produk_id].qty_kasir += item.qty;
+        } else if (item.role === 'VERIFIKATOR') {
+          rekapMap[item.produk_id].qty_verifikator += item.qty;
+        }
+      });
+
+      let csvLines = [];
+      csvLines.push('"produk_id","nama_produk","harga","qty_kasir","qty_verifikator","selisih"');
+
+      Object.values(rekapMap).forEach(p => {
+        const selisih = p.qty_kasir - p.qty_verifikator;
+        csvLines.push(`"${p.produk_id}","${String(p.nama_produk).replace(/"/g, '""')}",${p.harga},${p.qty_kasir},${p.qty_verifikator},${selisih}`);
+      });
+
+      exportCSVFile("\ufeff" + csvLines.join("\n"), `Rekap_Perbandingan_${targetCabang.toUpperCase()}_${new Date().toISOString().slice(0,10)}.csv`);
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      showModal("Gagal", "Gagal mengambil data rekap: " + err.message);
+    }
+  }
+
+  function exportCSVFile(csvContentStr, fileName) {
+    const blob = new Blob([csvContentStr], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  function showModal(title, message) {
+    document.getElementById('modalTitle').innerText = title;
+    document.getElementById('modalMessage').innerText = message;
+    document.getElementById('notifyModal').style.display = 'flex';
+  }
+
+  function closeModal() {
+    document.getElementById('notifyModal').style.display = 'none';
+  }
+
+  function cariManual(e) {
+    e.preventDefault();
+    const input = document.getElementById('barcodeInput');
+    if (input.value) {
+      lookupProduct(input.value);
+      input.value = "";
+    }
+  }
+
+  // ================= KAMERA / SCANNER =================
+  let qrScanner = null;
+  let isScanning = false;
+  let lastScan = { code: '', time: 0 };
+
+  function scannerOptions() {
+    const F = Html5QrcodeSupportedFormats;
+    return {
+      formatsToSupport: [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.QR_CODE],
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true }, // jauh lebih akurat untuk barcode 1D di Chrome Android
+      verbose: false
+    };
+  }
+
+  function onScanSuccess(decodedText) {
+    const now = Date.now();
+    if (decodedText === lastScan.code && now - lastScan.time < 2000) return; // cegah baca ganda
+    lastScan = { code: decodedText, time: now };
+    if (navigator.vibrate) navigator.vibrate(60);
+    try { qrScanner.pause(true); } catch (e) {}   // bekukan kamera sampai data disimpan
+    lookupProduct(decodedText);
+    if (!activeItem) setTimeout(resumeScanner, 1500); // produk tidak ketemu -> lanjut scan otomatis
+  }
+
+  function resumeScanner() {
+    if (qrScanner && isScanning) {
+      try { qrScanner.resume(); } catch (e) {}
+    }
+  }
+
+  function cameraErrorMessage(err) {
+    const name = (err && err.name) || '';
+    const msg = String(err && err.message ? err.message : err);
+    if (!window.isSecureContext) return "Kamera hanya bisa dipakai lewat HTTPS.";
+    if ((name === 'NotAllowedError' || /permission|denied/i.test(msg)) && window.self !== window.top)
+      return "Google Apps Script memblokir kamera langsung untuk halaman yang tampil di dalam iframe (" + (name || msg) + "). Ini batasan Apps Script, bukan izin browser. Gunakan tombol 📸 Foto, atau scanner barcode Bluetooth/USB.";
+    if (name === 'NotAllowedError' || /permission|denied/i.test(msg))
+      return "Akses kamera diblokir (" + (name || msg) + "). Izinkan kamera untuk situs ini di pengaturan browser, dan buka aplikasi lewat Chrome/Safari (bukan browser di dalam WhatsApp/Instagram). Jika tetap gagal, pakai tombol 📸 Foto.";
+    if (name === 'NotFoundError' || /requested device not found/i.test(msg))
+      return "Kamera tidak ditemukan di perangkat ini.";
+    if (name === 'NotReadableError' || /could not start video/i.test(msg))
+      return "Kamera sedang dipakai aplikasi lain. Tutup aplikasi/tab lain yang memakai kamera, lalu coba lagi.";
+    return "Kamera gagal dibuka: " + (name ? name + " - " : "") + msg;
+  }
+
+  async function startScanner() {
+    if (typeof Html5Qrcode === 'undefined')
+      return showModal("Scanner Belum Siap", "Library scanner belum termuat. Periksa koneksi internet lalu muat ulang halaman.");
+    if (isScanning) return resumeScanner();
+
+    document.getElementById('reader').style.display = 'block';
+    try {
+      if (!qrScanner) qrScanner = new Html5Qrcode("reader", scannerOptions());
+      await qrScanner.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: (vw, vh) => {
+            const w = Math.floor(Math.min(vw, 360) * 0.85);
+            return { width: w, height: Math.floor(w * 0.55) };
+          }
+        },
+        onScanSuccess,
+        () => {}
+      );
+      isScanning = true;
+    } catch (err) {
+      isScanning = false;
+      document.getElementById('reader').style.display = 'none';
+      showModal("Kamera Tidak Bisa Dibuka", cameraErrorMessage(err));
+    }
+  }
+
+  async function stopScanner() {
+    try {
+      if (qrScanner) {
+        if (isScanning) await qrScanner.stop();
+        qrScanner.clear();
+      }
+    } catch (e) { /* abaikan */ }
+    qrScanner = null;
+    isScanning = false;
+    document.getElementById('reader').style.display = 'none';
+  }
+
+  // Cadangan jika kamera langsung diblokir: ambil foto via kamera bawaan HP, lalu baca barcode dari gambar
+  async function scanFromPhoto(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    try {
+      if (typeof Html5Qrcode === 'undefined') throw new Error('Library scanner belum termuat');
+      const tmp = new Html5Qrcode("reader-file", scannerOptions());
+      const text = await tmp.scanFile(file, false);
+      try { tmp.clear(); } catch (e) {}
+      lookupProduct(text);
+    } catch (err) {
+      showModal("Barcode Tidak Terbaca", "Coba foto lagi dari jarak lebih dekat, pastikan barcode tajam, terang, dan memenuhi frame. Atau ketik kodenya manual.");
+    }
+    input.value = '';
+  }
+
+<<<<<<< HEAD
+  const THEME_KEY = 'scanstock.theme';
+
+  function applyTheme(theme) {
+    const root = document.documentElement;
+    const btn = document.getElementById('btnTheme');
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (theme === 'dark') {
+      root.setAttribute('data-theme', 'dark');
+      if (btn) btn.innerText = '☀️ Light';
+      if (meta) meta.setAttribute('content', '#121212');
+    } else {
+      root.removeAttribute('data-theme');
+      if (btn) btn.innerText = '🌙 Dark';
+      if (meta) meta.setAttribute('content', '#1a73e8');
+    }
+  }
+
+  function toggleTheme() {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
+  }
+
+
+  // ---------- Mulai ----------
+  (function init() {
+    applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
+=======
+  function toggleTheme() {
+    const root = document.documentElement;
+    const currentTheme = root.getAttribute('data-theme');
+    const btn = document.querySelector('.header .btn');
+    if (currentTheme === 'dark') {
+      root.removeAttribute('data-theme');
+      btn.innerText = '🌙 Dark';
+    } else {
+      root.setAttribute('data-theme', 'dark');
+      btn.innerText = '☀️ Light';
+    }
+  }
+
+  // ---------- Mulai ----------
+  (function init() {
+>>>>>>> 5416602babdfc5c7a6653977cb5275f65fe89843
+    document.getElementById('dbStatus').innerText = "Silakan login untuk memuat data produk.";
+    try {
+      const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+      if (saved && saved.token && saved.user) { session = saved; prosesMasuk(); }
+    } catch (e) {}
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    }
+  })();
+</script>
+
+</body>
+</html>
