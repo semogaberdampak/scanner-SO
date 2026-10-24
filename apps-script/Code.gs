@@ -13,9 +13,8 @@
  */
 
 // ===== PENGATURAN =====
-var PIN_DEFAULT = '123456';          // PIN Kasir & Verifikator semua cabang
-var PIN_ADMIN_DEFAULT = '123admin456'; // PIN Super User (admin) saja          // Disarankan: isi Script Properties APP_PIN agar PIN tidak ada di kode
-var SESSION_SECONDS = 6 * 60 * 60;   // 6 jam (batas maksimum CacheService)
+// var PIN_DEFAULT = '';          // Disarankan: isi Script Properties APP_PIN agar PIN tidak ada di kode
+var SESSION_SECONDS = 2 * 60 * 60;   // 2 jam (batas maksimum CacheService)
 var CABANG_VALID = ['kranggan', 'katedral', 'santamaria', 'athanasius', 'antonius', 'paulus'];
 var ROLE_VALID = ['KASIR', 'VERIFIKATOR'];
 
