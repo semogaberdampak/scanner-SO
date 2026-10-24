@@ -1,6 +1,6 @@
 // Service worker: menyimpan "cangkang" aplikasi agar cepat terbuka & bisa di-install.
 // Data (API Apps Script) TIDAK di-cache, selalu diambil langsung dari server.
-const CACHE = 'scanstock-v4';
+const CACHE = 'scanstock-v5';
 const ASSETS = [
   './',
   'index.html',
@@ -28,6 +28,18 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   const url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== self.location.origin) return; // API & domain lain: langsung ke jaringan
+
+  // config.js: ambil dari jaringan dulu supaya perubahan (mis. POLL_SECONDS) langsung berlaku
+  if (url.pathname.endsWith('/config.js')) {
+    e.respondWith(
+      fetch(req).then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(req, copy));
+        return res;
+      }).catch(() => caches.match(req))
+    );
+    return;
+  }
 
   // Stale-while-revalidate: tampil cepat dari cache, lalu perbarui di latar belakang
   e.respondWith(

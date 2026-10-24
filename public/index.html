@@ -358,6 +358,20 @@
     .recon-field { width: 100%; box-sizing: border-box; margin: 4px 0 12px; }
     .btn-row { display: flex; gap: 8px; }
     .btn-row .btn { flex: 1; }
+    /* ===== Pilih produk (pencarian kode singkat) ===== */
+    .pick-item {
+      display: flex; gap: 10px; align-items: center; width: 100%; text-align: left; cursor: pointer;
+      background: var(--card-bg-sub); color: var(--text-main); font-family: inherit;
+      border: 1px solid var(--border-color); border-left: 4px solid var(--accent);
+      border-radius: 10px; padding: 10px;
+    }
+    .pick-item:hover { border-color: var(--accent); }
+    .pick-main { flex: 1 1 auto; min-width: 0; }
+    .pick-kode { font-size: 14px; font-weight: 700; letter-spacing: .3px; }
+    .pick-kode mark { background: var(--btn-secondary-bg); color: var(--text-main); border-radius: 3px; padding: 0 2px; outline: 1px solid var(--accent); }
+    .pick-nama { font-size: 12px; color: var(--text-muted); margin-top: 2px; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .pick-harga { flex: 0 0 auto; font-size: 12px; font-weight: 600; text-align: right; }
+    #pilihModal { z-index: 2060; }
     #notifyModal { z-index: 2300; }
     #notifPanel { z-index: 2050; }
     #reconModal { z-index: 2100; }
@@ -442,7 +456,7 @@
     <div id="reader-file" style="display: none;"></div>
 
     <form onsubmit="cariManual(event)" class="input-group">
-      <input type="text" id="barcodeInput" placeholder="Scan Barcode / Ketik Kode..." autofocus autocomplete="off">
+      <input type="text" id="barcodeInput" placeholder="Scan / ketik kode (boleh sebagian)..." autofocus autocomplete="off">
       <button type="submit" class="btn btn-primary" style="flex: 0 0 auto;">Cari</button>
     </form>
 
@@ -462,6 +476,16 @@
         <button class="btn btn-primary" id="btnSimpan" style="flex: 1.2;" onclick="simpanInputQty()">Simpan Input</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Pilih produk dari kode singkat -->
+<div class="modal-overlay" id="pilihModal">
+  <div class="modal-box wide">
+    <div class="modal-title" style="margin-bottom: 4px;">Pilih Produk</div>
+    <div class="panel-sub" id="pilihSub">-</div>
+    <div class="notif-list" id="pilihList"></div>
+    <button class="btn btn-secondary" style="width: 100%;" onclick="tutupPilihProduk()">Batal</button>
   </div>
 </div>
 
@@ -522,7 +546,8 @@
 </div>
 
 <script>
-  let productLookupMap = {};
+  let productLookupMap = {};   // kunci HURUF BESAR: produk_id atau ISBN
+  let productList = [];        // [{ idU, item }] untuk pencarian sebagian
   let currentUser = null;
   let activeItem = null;
   let session = null; // { token, user }
@@ -571,11 +596,17 @@
     try {
       const res = await api('master');
       productLookupMap = {};
+      productList = [];
       res.data.forEach(item => {
-        if (item.produk_id) {
-          productLookupMap[item.produk_id.trim()] = item;
-          if (item.isbn) productLookupMap[item.isbn.trim().replace(/[- ]/g, '')] = item;
-        }
+        if (!item.produk_id) return;
+        const idU = String(item.produk_id).trim().toUpperCase();
+        productLookupMap[idU] = item;
+        productList.push({ idU: idU, item: item });
+      });
+      // ISBN dipakai sebagai kunci tambahan (tidak boleh menimpa produk_id yang sama)
+      res.data.forEach(item => {
+        const isbn = String(item.isbn || '').trim().replace(/[- ]/g, '').toUpperCase();
+        if (isbn && !(isbn in productLookupMap)) productLookupMap[isbn] = item;
       });
       status.innerText = "✅ Database Siap (" + res.data.length + " Produk Loaded)";
     } catch (err) {
@@ -623,6 +654,7 @@
     currentUser = null;
     session = null;
     productLookupMap = {};
+    productList = [];
     activeItem = null;
     try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
     document.getElementById('loginSection').style.display = 'flex';
@@ -634,31 +666,34 @@
     resetNotif();
   }
 
+  function tampilkanProduk(item) {
+    const card = document.getElementById('resultCard');
+    activeItem = item;
+    document.getElementById('resId').innerText = "ID: " + item.produk_id + (item.isbn ? " | ISBN: " + item.isbn : "");
+    document.getElementById('resTitle').innerText = item.nama_produk;
+    document.getElementById('resPrice').innerText = "Rp " + Number(item.harga).toLocaleString('id-ID');
+    card.className = "card-result";
+    card.style.display = "block";
+    if (!isScanning) document.getElementById('inputQty').focus();
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function produkTidakDitemukan(kode) {
+    const card = document.getElementById('resultCard');
+    activeItem = null;
+    document.getElementById('resId').innerText = "Kode dicari: " + kode;
+    document.getElementById('resTitle').innerText = "Produk Tidak Ditemukan";
+    document.getElementById('resPrice').innerText = "Rp 0";
+    card.className = "card-result error";
+    card.style.display = "block";
+  }
+
+  // Kode persis (produk_id atau ISBN), tanpa peduli huruf besar/kecil. Dipakai oleh scanner kamera & foto.
   function lookupProduct(scannedCode) {
     if (!scannedCode) return;
-    const cleanCode = String(scannedCode).trim().replace(/[- ]/g, '');
-    const card = document.getElementById('resultCard');
-    
-    let item = productLookupMap[cleanCode];
-    
-    if (item) {
-      activeItem = item;
-      document.getElementById('resId').innerText = "ID: " + item.produk_id + (item.isbn ? " | ISBN: " + item.isbn : "");
-      document.getElementById('resTitle').innerText = item.nama_produk;
-      document.getElementById('resPrice').innerText = "Rp " + Number(item.harga).toLocaleString('id-ID');
-      
-      card.className = "card-result";
-      card.style.display = "block";
-      if (!isScanning) document.getElementById('inputQty').focus();
-      card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    } else {
-      activeItem = null;
-      document.getElementById('resId').innerText = "Kode Di-scan: " + scannedCode;
-      document.getElementById('resTitle').innerText = "Produk Tidak Ditemukan";
-      document.getElementById('resPrice').innerText = "Rp 0";
-      card.className = "card-result error";
-      card.style.display = "block";
-    }
+    const key = String(scannedCode).trim().replace(/[- ]/g, '').toUpperCase();
+    const item = productLookupMap[key];
+    if (item) tampilkanProduk(item); else produkTidakDitemukan(scannedCode);
   }
 
   async function simpanInputQty() {
@@ -777,14 +812,74 @@
     document.getElementById('notifyModal').style.display = 'none';
   }
 
+  const MIN_KODE_SEBAGIAN = 3;
+  const MAKS_PILIHAN = 50;
+
   function cariManual(e) {
     e.preventDefault();
     const input = document.getElementById('barcodeInput');
-    if (input.value) {
-      lookupProduct(input.value);
-      input.value = "";
-    }
+    const raw = input.value.trim();
+    if (!raw) return;
+    cariFleksibel(raw);
+    input.value = "";
   }
+
+  // 1) kode persis  2) kode berakhiran yang diketik (23lb0001, lb0001)  3) kode memuat yang diketik
+  function cariFleksibel(raw) {
+    const key = raw.replace(/[\s-]/g, '').toUpperCase();
+    const persis = productLookupMap[key];
+    if (persis) return tampilkanProduk(persis);
+
+    if (key.length < MIN_KODE_SEBAGIAN)
+      return showModal("Kode Terlalu Pendek", `Ketik minimal ${MIN_KODE_SEBAGIAN} karakter terakhir dari kode produk, atau scan barcode-nya.`);
+
+    let hasil = productList.filter(p => p.idU.endsWith(key));
+    let mode = 'akhir';
+    if (hasil.length === 0) {
+      hasil = productList.filter(p => p.idU.includes(key));
+      mode = 'sebagian';
+    }
+    if (hasil.length === 0) return produkTidakDitemukan(raw);
+    if (hasil.length === 1) return tampilkanProduk(hasil[0].item);
+
+    hasil.sort((x, y) => (x.idU < y.idU ? -1 : x.idU > y.idU ? 1 : 0));
+    bukaPilihProduk(raw, key, hasil, mode);
+  }
+
+  function bukaPilihProduk(raw, key, hasil, mode) {
+    const list = document.getElementById('pilihList');
+    list.textContent = '';
+    let sub = `${hasil.length} produk cocok dengan “${raw}”`;
+    if (mode === 'sebagian') sub += ' (dicari di bagian mana pun dari kode)';
+    if (hasil.length > MAKS_PILIHAN) sub += ` · menampilkan ${MAKS_PILIHAN} pertama, ketik kode lebih lengkap untuk mempersempit`;
+    document.getElementById('pilihSub').textContent = sub;
+
+    hasil.slice(0, MAKS_PILIHAN).forEach(p => {
+      const kode = String(p.item.produk_id).trim();
+      const i = mode === 'akhir' ? kode.length - key.length : p.idU.indexOf(key);
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'pick-item';
+      btn.onclick = () => { tutupPilihProduk(); tampilkanProduk(p.item); };
+
+      const main = document.createElement('div'); main.className = 'pick-main';
+      const kd = document.createElement('div'); kd.className = 'pick-kode';
+      const hit = document.createElement('mark'); hit.textContent = kode.substr(i, key.length);
+      kd.append(kode.substr(0, i), hit, kode.substr(i + key.length));
+      const nm = document.createElement('div'); nm.className = 'pick-nama'; nm.textContent = p.item.nama_produk;
+      main.append(kd, nm);
+
+      const hg = document.createElement('div'); hg.className = 'pick-harga';
+      hg.textContent = 'Rp ' + (Number(p.item.harga) || 0).toLocaleString('id-ID');
+
+      btn.append(main, hg);
+      list.appendChild(btn);
+    });
+    document.getElementById('pilihModal').style.display = 'flex';
+  }
+
+  function tutupPilihProduk() { document.getElementById('pilihModal').style.display = 'none'; }
 
   // ================= KAMERA / SCANNER =================
   let qrScanner = null;
@@ -912,7 +1007,7 @@
 
 
   // ================= NOTIFIKASI SELISIH (polling) =================
-  const POLL_MS = Math.max(15, Number(window.APP_CONFIG && window.APP_CONFIG.POLL_SECONDS) || 60) * 1000;
+  const POLL_MS = Math.max(5, Number(window.APP_CONFIG && window.APP_CONFIG.POLL_SECONDS) || 60) * 1000;
   let notif = { count: 0, items: [], menunggu: 0, updated: null };
   let notifSeen = false;       // sudah pernah menerima data dari server (untuk membedakan muatan awal)
   let pollTimer = null, polling = false, pollAgain = false;
@@ -939,7 +1034,7 @@
     notif = { count: 0, items: [], menunggu: 0, updated: null };
     notifSeen = false;
     reconItem = null;
-    ['notifPanel', 'reconModal', 'confirmModal'].forEach(id => document.getElementById(id).style.display = 'none');
+    ['notifPanel', 'reconModal', 'confirmModal', 'pilihModal'].forEach(id => document.getElementById(id).style.display = 'none');
     const bell = document.getElementById('btnBell');
     bell.style.display = 'none';
     bell.classList.remove('has-alert', 'ring');
@@ -1029,7 +1124,7 @@
     const cab = currentUser ? currentUser.cabang.toUpperCase() : '';
     const upd = notif.updated ? notif.updated.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/\./g, ':') : '-';
     document.getElementById('notifSub').textContent =
-      `Cabang ${cab} · diperbarui ${upd} · urut dari selisih terlama · cek otomatis tiap ${Math.round(POLL_MS / 1000)} detik`;
+      `Cabang ${cab} · diperbarui ${upd} · urut dari selisih terlama · cek otomatis tiap ${Math.round(POLL_MS / 1000)} detik (POLL_SECONDS)`;
 
     if (notif.items.length === 0) {
       const e = document.createElement('div');

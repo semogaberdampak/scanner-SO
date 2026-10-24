@@ -76,9 +76,17 @@ Setiap `git push` ke `main` otomatis men-deploy ulang.
 - Lonceng di pojok kanan atas (sebelah tombol tema) hanya untuk Kasir dan Verifikator. Badge = jumlah produk yang
   sudah diinput KEDUA peran tetapi nilainya berbeda. Urutan daftar: selisih terlama lebih dulu
   ("sejak" = waktu input terakhir dari kedua peran).
-- Aplikasi mengecek server tiap `POLL_SECONDS` detik (`public/config.js`, bawaan 60, minimum 15), hanya saat tab terlihat.
+- Aplikasi mengecek server tiap `POLL_SECONDS` detik (`public/config.js`, bawaan 60, minimum 5), hanya saat tab terlihat.
 - Klik baris -> isi nilai valid -> "Sudah yakin?" -> disimpan. Di sheet cabang: baris awal diwarnai oranye (nilai tidak diubah),
   satu baris REKONSILIASI hijau disisipkan tepat di bawahnya (kolom H "keterangan" mencatat siapa & nilai awal).
   Rekap dan notifikasi selalu membaca baris TERAKHIR tiap produk.
 - Input susulan setelah rekonsiliasi dicatat di baris baru berlabel LANJUTAN (baris rekonsiliasi tidak pernah diubah).
 - Setelah mengubah `Code.gs`, selalu buat versi deployment baru (Deploy > Manage deployments > Edit > New version).
+
+## Pencarian produk (ketik)
+
+- Tidak peka huruf besar/kecil (`1123lb0001` = `1123LB0001`).
+- Urutan: kode persis (produk_id atau ISBN) -> kode yang BERAKHIRAN dengan yang diketik (`23lb0001`, `lb0001`)
+  -> kode yang memuat yang diketik. Minimal 3 karakter untuk pencarian sebagian.
+- Jika cocok dengan lebih dari satu produk, muncul daftar pilihan (maksimal 50 baris, bagian yang diketik disorot).
+- Scanner kamera/foto tetap memakai kode persis (tidak sebagian), supaya hasil scan tidak salah produk.
