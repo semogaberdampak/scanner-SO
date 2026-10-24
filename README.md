@@ -90,3 +90,10 @@ Setiap `git push` ke `main` otomatis men-deploy ulang.
   -> kode yang memuat yang diketik. Minimal 3 karakter untuk pencarian sebagian.
 - Jika cocok dengan lebih dari satu produk, muncul daftar pilihan (maksimal 50 baris, bagian yang diketik disorot).
 - Scanner kamera/foto tetap memakai kode persis (tidak sebagian), supaya hasil scan tidak salah produk.
+
+## Warna
+
+Palet: `#000000`, `#DFDEDC`, `#464545`, `#00ACAC` (teal), `#A6A7A2`. Semua warna ada di blok `:root` (terang) dan
+`[data-theme="dark"]` (gelap) di `public/index.html`. Teal dipakai sebagai latar tombol dengan teks hitam; untuk teks/garis
+di mode terang dipakai `--accent-text` (teal lebih gelap) agar kontras minimal 4.5:1. Warna merah (selisih/peringatan)
+sengaja di luar palet karena bermakna peringatan.

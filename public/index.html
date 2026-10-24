@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#1a73e8">
+  <meta name="theme-color" content="#DFDEDC">
   <script>
     // Terapkan tema tersimpan sedini mungkin agar tidak berkedip
     (function () {
       try {
         if (localStorage.getItem('scanstock.theme') === 'dark') {
           document.documentElement.setAttribute('data-theme', 'dark');
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#000000');
         }
       } catch (e) {}
     })();
@@ -33,43 +34,61 @@
   </script>
   <script src="config.js" onerror="window.__configGagal = true; console.warn('config.js gagal dimuat, memakai nilai cadangan di index.html')"></script>
   <style>
+    /* ==== Palet: hitam #000000 · abu terang #DFDEDC · abu gelap #464545 · teal #00ACAC · abu sedang #A6A7A2 ====
+       Teal dipakai sebagai LATAR (tombol) dengan teks HITAM. Untuk TEKS/garis di mode terang dipakai teal yang
+       lebih gelap, karena teal asli hanya 2,5:1 di atas kartu terang. Semua pasangan teks >= 4.5:1. */
     :root {
-      --bg-primary: #f4f6f9;
-      --bg-card: #ffffff;
-      --text-main: #202124;
-      --text-muted: #5f6368;
-      --accent: #1a73e8;
-      --accent-hover: #1557b0;
-      --btn-secondary-bg: #e8f0fe;
-      --btn-secondary-text: #1a73e8;
-      --border-color: #dadce0;
-      --card-bg-sub: #f8f9fa;
-      --modal-overlay: rgba(0, 0, 0, 0.5);
+      --bg-primary: #DFDEDC;
+      --bg-card: #F3F2F1;
+      --card-bg-sub: #E8E7E5;
+      --input-bg: #FAF9F8;
+      --text-main: #000000;
+      --text-muted: #464545;
+      --border-color: #A6A7A2;
+      --border-strong: #6F706B;     /* tepi kolom isian (>= 3:1) */
+      --placeholder: #6B6C67;
+      --accent: #00ACAC;            /* latar tombol utama, tab terpilih */
+      --accent-hover: #009797;
+      --accent-text: #006868;       /* judul, harga, tautan */
+      --accent-line: #008282;       /* garis penanda */
+      --on-accent: #000000;         /* teks di atas teal */
+      --focus: #006868;
+      --focus-ring: rgba(0, 104, 104, 0.25);
+      --btn-secondary-bg: #D4E8E7;
+      --btn-secondary-text: #005858;
+      --modal-overlay: rgba(0, 0, 0, 0.55);
       --safe-area-bottom: env(safe-area-inset-bottom, 0px);
-      --alert: #c5221f;            /* teks/ikon peringatan di atas latar terang */
-      --alert-bg: #fce8e6;
-      --alert-border: #f5b8b3;
-      --badge-bg: #d93025;
-      --badge-text: #ffffff;
+      --alert: #B3261E;
+      --alert-bg: #F6DEDB;
+      --alert-border: #DDA19B;
+      --badge-bg: #C5221F;
+      --badge-text: #FFFFFF;
     }
-
     [data-theme="dark"] {
-      --bg-primary: #121212;
-      --bg-card: #1e1e1e;
-      --text-main: #e8eaed;
-      --text-muted: #9aa0a6;
-      --accent: #8ab4f8;
-      --accent-hover: #aecbfa;
-      --btn-secondary-bg: #2d3748;
-      --btn-secondary-text: #8ab4f8;
-      --border-color: #3c4043;
-      --card-bg-sub: #282a2d;
-      --modal-overlay: rgba(0, 0, 0, 0.75);
-      --alert: #f28b82;            /* merah muda terang agar terbaca di latar gelap */
-      --alert-bg: #3b2022;
-      --alert-border: #6b3a3d;
-      --badge-bg: #d93025;
-      --badge-text: #ffffff;
+      --bg-primary: #000000;
+      --bg-card: #181717;
+      --card-bg-sub: #242323;
+      --input-bg: #0D0D0D;
+      --text-main: #DFDEDC;
+      --text-muted: #A6A7A2;
+      --border-color: #464545;
+      --border-strong: #7D7E79;
+      --placeholder: #8A8B86;
+      --accent: #00ACAC;
+      --accent-hover: #1FC4C4;
+      --accent-text: #00ACAC;
+      --accent-line: #00ACAC;
+      --on-accent: #000000;
+      --focus: #00ACAC;
+      --focus-ring: rgba(0, 172, 172, 0.35);
+      --btn-secondary-bg: #1B2E2E;
+      --btn-secondary-text: #2CCFCF;
+      --modal-overlay: rgba(0, 0, 0, 0.8);
+      --alert: #F28B82;
+      --alert-bg: #3A2121;
+      --alert-border: #6E3B3B;
+      --badge-bg: #C5221F;
+      --badge-text: #FFFFFF;
     }
 
     * { 
@@ -117,7 +136,7 @@
     .header h2 { 
       margin: 0; 
       font-size: clamp(16px, 4.5vw, 20px); 
-      color: var(--accent); 
+      color: var(--accent-text); 
       font-weight: 700;
     }
 
@@ -136,7 +155,7 @@
     }
     .role-badge { 
       font-weight: 700; 
-      color: var(--accent); 
+      color: var(--accent-text); 
       text-transform: uppercase; 
     }
 
@@ -156,7 +175,8 @@
       user-select: none;
     }
     .btn:active { transform: scale(0.98); }
-    .btn-primary { background: var(--accent); color: #ffffff; }
+    .btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+    .btn-primary { background: var(--accent); color: var(--on-accent); }
     .btn-primary:hover { background: var(--accent-hover); }
     .btn-secondary { background: var(--btn-secondary-bg); color: var(--btn-secondary-text); border-color: var(--border-color); }
 
@@ -179,15 +199,16 @@
       width: 100%;
       min-height: 44px;
       padding: 10px 12px; 
-      border: 1px solid var(--border-color); 
-      background: var(--bg-card); 
+      border: 1px solid var(--border-strong); 
+      background: var(--input-bg); 
       color: var(--text-main); 
       border-radius: 10px; 
       font-size: 16px; /* Mencegah Auto-Zoom di iOS Safari */
       outline: none; 
       -webkit-appearance: none;
     }
-    input:focus, select:focus { border-color: var(--accent); }
+    input:focus, select:focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--focus-ring); }
+    input::placeholder { color: var(--placeholder); opacity: 1; }
 
     /* Segmented Control untuk Pilihan Role */
     .segmented-role {
@@ -212,13 +233,13 @@
     }
     .segmented-role input[type="radio"]:checked + span {
       background: var(--accent);
-      color: #ffffff;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+      color: var(--on-accent);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.18);
     }
 
     .card-result { 
       background: var(--card-bg-sub); 
-      border-left: 5px solid var(--accent); 
+      border-left: 5px solid var(--accent-line); 
       padding: 14px; 
       border-radius: 12px; 
       display: none; 
@@ -227,7 +248,7 @@
       border-right: 1px solid var(--border-color); 
       border-bottom: 1px solid var(--border-color); 
     }
-    .card-result.error { border-left-color: #ea4335; }
+    .card-result.error { border-left-color: var(--alert); }
     .prod-id { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; word-break: break-all; }
     .prod-title { font-size: clamp(15px, 4vw, 17px); font-weight: 700; margin-bottom: 12px; color: var(--text-main); line-height: 1.3; }
     
@@ -241,7 +262,7 @@
       margin-bottom: 12px; 
       border: 1px solid var(--border-color); 
     }
-    .price-box { font-size: clamp(16px, 4.5vw, 19px); font-weight: 700; color: var(--accent); }
+    .price-box { font-size: clamp(16px, 4.5vw, 19px); font-weight: 700; color: var(--accent-text); }
 
     .entry-form { 
       display: flex; 
@@ -281,7 +302,7 @@
       from { transform: scale(0.85); opacity: 0; }
       to { transform: scale(1); opacity: 1; }
     }
-    .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; color: var(--accent); }
+    .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; color: var(--accent-text); }
     .modal-box { max-height: 90vh; overflow-y: auto; }
     .modal-body { font-size: 14px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.4; }
 
@@ -344,7 +365,7 @@
       border: 1px solid var(--border-color); border-left: 4px solid var(--alert);
       border-radius: 10px; padding: 10px; font-family: inherit;
     }
-    .notif-item:hover { border-color: var(--accent); border-left-color: var(--alert); }
+    .notif-item:hover { border-color: var(--focus); border-left-color: var(--alert); }
     .notif-no {
       flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%;
       background: var(--alert-bg); color: var(--alert); border: 1px solid var(--alert-border);
@@ -370,13 +391,13 @@
     .pick-item {
       display: flex; gap: 10px; align-items: center; width: 100%; text-align: left; cursor: pointer;
       background: var(--card-bg-sub); color: var(--text-main); font-family: inherit;
-      border: 1px solid var(--border-color); border-left: 4px solid var(--accent);
+      border: 1px solid var(--border-color); border-left: 4px solid var(--accent-line);
       border-radius: 10px; padding: 10px;
     }
-    .pick-item:hover { border-color: var(--accent); }
+    .pick-item:hover { border-color: var(--focus); }
     .pick-main { flex: 1 1 auto; min-width: 0; }
     .pick-kode { font-size: 14px; font-weight: 700; letter-spacing: .3px; }
-    .pick-kode mark { background: var(--btn-secondary-bg); color: var(--text-main); border-radius: 3px; padding: 0 2px; outline: 1px solid var(--accent); }
+    .pick-kode mark { background: var(--btn-secondary-bg); color: var(--text-main); border-radius: 3px; padding: 0 2px; outline: 1px solid var(--focus); }
     .pick-nama { font-size: 12px; color: var(--text-muted); margin-top: 2px; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     .pick-harga { flex: 0 0 auto; font-size: 12px; font-weight: 600; text-align: right; }
     #pilihModal { z-index: 2060; }
@@ -1017,11 +1038,11 @@
     if (theme === 'dark') {
       root.setAttribute('data-theme', 'dark');
       if (btn) btn.innerText = '☀️ Light';
-      if (meta) meta.setAttribute('content', '#121212');
+      if (meta) meta.setAttribute('content', '#000000');
     } else {
       root.removeAttribute('data-theme');
       if (btn) btn.innerText = '🌙 Dark';
-      if (meta) meta.setAttribute('content', '#1a73e8');
+      if (meta) meta.setAttribute('content', '#DFDEDC');
     }
   }
 

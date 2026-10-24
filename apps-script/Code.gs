@@ -13,7 +13,8 @@
  */
 
 // ===== PENGATURAN =====
-var PIN_DEFAULT = '123456';          // Disarankan: isi Script Properties APP_PIN agar PIN tidak ada di kode
+var PIN_DEFAULT = '123456';          // PIN Kasir & Verifikator semua cabang
+var PIN_ADMIN_DEFAULT = '123admin456'; // PIN Super User (admin) saja          // Disarankan: isi Script Properties APP_PIN agar PIN tidak ada di kode
 var SESSION_SECONDS = 6 * 60 * 60;   // 6 jam (batas maksimum CacheService)
 var CABANG_VALID = ['kranggan', 'katedral', 'santamaria', 'athanasius', 'antonius', 'paulus'];
 var ROLE_VALID = ['KASIR', 'VERIFIKATOR'];
@@ -100,13 +101,18 @@ function json_(obj) {
 // ===== LOGIN & SESI =====
 function login_(b) {
   var pin = String(b.pin || '').trim();
-  var benar = String(PropertiesService.getScriptProperties().getProperty('APP_PIN') || PIN_DEFAULT);
+  var cabang = String(b.cabang || '').toLowerCase().trim();
+
+  // Admin dan cabang memakai PIN yang BERBEDA. Script Properties (APP_PIN_ADMIN / APP_PIN) boleh menggantikan bawaan.
+  var props = PropertiesService.getScriptProperties();
+  var benar = cabang === 'admin'
+    ? String(props.getProperty('APP_PIN_ADMIN') || PIN_ADMIN_DEFAULT)
+    : String(props.getProperty('APP_PIN') || PIN_DEFAULT);
   if (pin !== benar) {
     Utilities.sleep(800); // memperlambat tebak PIN
     return { ok: false, error: 'PIN salah.' };
   }
 
-  var cabang = String(b.cabang || '').toLowerCase().trim();
   var role = String(b.role || '').toUpperCase().trim();
   var user;
 
