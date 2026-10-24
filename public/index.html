@@ -23,7 +23,15 @@
   <meta name="apple-mobile-web-app-title" content="Scan Stock">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <script src="vendor/html5-qrcode.min.js"></script>
-  <script src="config.js"></script>
+  <script>
+    // Cadangan: dipakai bila config.js gagal dimuat (cache lama, pemblokir, dll.).
+    // Nilai di config.js tetap diutamakan kalau valid.
+    window.APP_DEFAULTS = {
+      API_URL: "https://script.google.com/macros/s/AKfycbzpxd_u_pFIDunZyh50aQRIMBlvdWZ5Ot3VCevsVKTX2kEGRytqOxkFOf6hyX-9Rfh7/exec",
+      POLL_SECONDS: 60
+    };
+  </script>
+  <script src="config.js" onerror="window.__configGagal = true; console.warn('config.js gagal dimuat, memakai nilai cadangan di index.html')"></script>
   <style>
     :root {
       --bg-primary: #f4f6f9;
@@ -553,12 +561,24 @@
   let session = null; // { token, user }
   const SESSION_KEY = 'scanstock.session.v1';
 
+  // Gabungkan config.js (utama) dengan nilai cadangan di index.html
+  function getConfig() {
+    const d = window.APP_DEFAULTS || {};
+    const c = window.APP_CONFIG || {};
+    const valid = u => typeof u === 'string' && /^https:\/\/script\.google\.com\//.test(u);
+    return {
+      API_URL: valid(c.API_URL) ? c.API_URL : (valid(d.API_URL) ? d.API_URL : ''),
+      POLL_SECONDS: Number(c.POLL_SECONDS) || Number(d.POLL_SECONDS) || 60
+    };
+  }
+
   // ---------- API (Google Apps Script sebagai backend) ----------
   // Content-Type text/plain sengaja dipakai agar tidak memicu preflight CORS.
   async function api(action, payload) {
-    const url = (window.APP_CONFIG && window.APP_CONFIG.API_URL) || '';
-    if (!url || url.indexOf('GANTI_DENGAN') >= 0) {
-      throw Object.assign(new Error('API_URL belum diisi di config.js'), { code: 'CONFIG' });
+    const url = getConfig().API_URL;
+    if (!url) {
+      const status = window.APP_CONFIG ? 'config.js termuat tetapi API_URL-nya tidak valid' : 'config.js TIDAK termuat';
+      throw Object.assign(new Error('API_URL tidak ditemukan (' + status + '). Periksa config.js atau nilai cadangan di index.html.'), { code: 'CONFIG' });
     }
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 30000);
@@ -1007,7 +1027,7 @@
 
 
   // ================= NOTIFIKASI SELISIH (polling) =================
-  const POLL_MS = Math.max(5, Number(window.APP_CONFIG && window.APP_CONFIG.POLL_SECONDS) || 60) * 1000;
+  const POLL_MS = Math.max(5, getConfig().POLL_SECONDS) * 1000;
   let notif = { count: 0, items: [], menunggu: 0, updated: null };
   let notifSeen = false;       // sudah pernah menerima data dari server (untuk membedakan muatan awal)
   let pollTimer = null, polling = false, pollAgain = false;

@@ -1,6 +1,6 @@
 // Service worker: menyimpan "cangkang" aplikasi agar cepat terbuka & bisa di-install.
 // Data (API Apps Script) TIDAK di-cache, selalu diambil langsung dari server.
-const CACHE = 'scanstock-v5';
+const CACHE = 'scanstock-v6';
 const ASSETS = [
   './',
   'index.html',
@@ -29,14 +29,17 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== self.location.origin) return; // API & domain lain: langsung ke jaringan
 
-  // config.js: ambil dari jaringan dulu supaya perubahan (mis. POLL_SECONDS) langsung berlaku
-  if (url.pathname.endsWith('/config.js')) {
+  // Halaman & config.js: ambil dari jaringan dulu supaya versi terbaru selalu dipakai;
+  // cache hanya cadangan saat offline.
+  if (req.mode === 'navigate' || url.pathname.endsWith('/config.js') || url.pathname.endsWith('/index.html')) {
     e.respondWith(
       fetch(req).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(req, copy));
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy));
+        }
         return res;
-      }).catch(() => caches.match(req))
+      }).catch(() => caches.match(req).then((r) => r || caches.match('index.html')))
     );
     return;
   }
