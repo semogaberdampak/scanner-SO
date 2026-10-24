@@ -1,0 +1,17 @@
+{
+  "name": "System Scan & Stock",
+  "short_name": "Scan Stock",
+  "description": "Scan barcode dan input stok per cabang (Kasir & Verifikator)",
+  "lang": "id",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#DFDEDC",
+  "theme_color": "#00ACAC",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
