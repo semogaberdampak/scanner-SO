@@ -70,3 +70,15 @@ Setiap `git push` ke `main` otomatis men-deploy ulang.
 - Menambah cabang: ubah `CABANG_VALID` di `Code.gs` dan daftar `<option>` di `public/index.html`.
 - Setelah mengubah file di `public/`, naikkan `CACHE = 'scanstock-v2'` di `sw.js` (mis. `v2`) agar HP mengambil versi terbaru.
 - Aplikasi memerlukan internet; belum ada antrean offline.
+
+## Notifikasi selisih & pencocokan
+
+- Lonceng di pojok kanan atas (sebelah tombol tema) hanya untuk Kasir dan Verifikator. Badge = jumlah produk yang
+  sudah diinput KEDUA peran tetapi nilainya berbeda. Urutan daftar: selisih terlama lebih dulu
+  ("sejak" = waktu input terakhir dari kedua peran).
+- Aplikasi mengecek server tiap `POLL_SECONDS` detik (`public/config.js`, bawaan 60, minimum 15), hanya saat tab terlihat.
+- Klik baris -> isi nilai valid -> "Sudah yakin?" -> disimpan. Di sheet cabang: baris awal diwarnai oranye (nilai tidak diubah),
+  satu baris REKONSILIASI hijau disisipkan tepat di bawahnya (kolom H "keterangan" mencatat siapa & nilai awal).
+  Rekap dan notifikasi selalu membaca baris TERAKHIR tiap produk.
+- Input susulan setelah rekonsiliasi dicatat di baris baru berlabel LANJUTAN (baris rekonsiliasi tidak pernah diubah).
+- Setelah mengubah `Code.gs`, selalu buat versi deployment baru (Deploy > Manage deployments > Edit > New version).

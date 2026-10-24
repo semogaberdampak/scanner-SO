@@ -1,6 +1,6 @@
 // Service worker: menyimpan "cangkang" aplikasi agar cepat terbuka & bisa di-install.
 // Data (API Apps Script) TIDAK di-cache, selalu diambil langsung dari server.
-const CACHE = 'scanstock-v3';
+const CACHE = 'scanstock-v4';
 const ASSETS = [
   './',
   'index.html',
