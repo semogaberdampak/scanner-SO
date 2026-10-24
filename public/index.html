@@ -425,7 +425,7 @@
   <div id="loginSection" style="display: flex; flex-direction: column; gap: 10px;">
     <div style="font-size: 14px; font-weight: 600; text-align: center; color: var(--text-muted);">Pilih Cabang & Role Tugas</div>
     
-    <select id="loginBranch">
+    <select id="loginBranch" onchange="aturKeyboardPin()">
       <option value="kranggan">Cabang - Kranggan</option>
       <option value="katedral">Cabang - Katedral</option>
       <option value="santamaria">Cabang - Santa Maria</option>
@@ -446,7 +446,7 @@
       </label>
     </div>
 
-    <input type="password" id="loginPass" placeholder="Masukkan PIN / Password" inputmode="numeric">
+    <input type="password" id="loginPass" placeholder="Masukkan PIN / Password" inputmode="numeric" autocomplete="off">
     <button class="btn btn-primary" id="btnLogin" onclick="login()">Login</button>
   </div>
 
@@ -633,6 +633,12 @@
       if (handleAuthError(err)) return;
       status.innerText = "❌ Gagal memuat data master: " + err.message;
     }
+  }
+
+  // PIN admin memuat huruf, jadi keyboard angka hanya dipakai untuk cabang
+  function aturKeyboardPin() {
+    const admin = document.getElementById('loginBranch').value === 'admin';
+    document.getElementById('loginPass').setAttribute('inputmode', admin ? 'text' : 'numeric');
   }
 
   async function login() {
