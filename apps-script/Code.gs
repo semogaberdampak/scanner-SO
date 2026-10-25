@@ -13,8 +13,8 @@
  */
 
 // ===== PENGATURAN =====
-var PIN_DEFAULT = '123456';          // PIN Kasir & Verifikator semua cabang
-var PIN_ADMIN_DEFAULT = '123admin456'; // PIN Super User (admin) saja          // Disarankan: isi Script Properties APP_PIN agar PIN tidak ada di kode
+// var PIN_DEFAULT = '';          // PIN Kasir & Verifikator semua cabang
+// var PIN_ADMIN_DEFAULT = ''; // PIN Super User (admin) saja          // Disarankan: isi Script Properties APP_PIN agar PIN tidak ada di kode
 var SESSION_SECONDS = 6 * 60 * 60;   // 6 jam (batas maksimum CacheService)
 var CABANG_VALID = ['kranggan', 'katedral', 'santamaria', 'athanasius', 'antonius', 'paulus'];
 var ROLE_VALID = ['KASIR', 'VERIFIKATOR'];
@@ -29,6 +29,9 @@ var FORMAT_WAKTU = 'dd/MM/yyyy HH:mm:ss';
 var WARNA_AWAL = '#FCE4D6';   // baris input awal yang selisih (oranye muda)
 var WARNA_REKON = '#E2EFDA';  // baris rekonsiliasi (hijau muda)
 var NOTIF_CACHE_DETIK = 60;
+var SHEET_UJI = 'tes_input';        // sheet khusus uji coba admin (semua fitur, tanpa jadwal)
+var TZ_AKSES = 'Asia/Jakarta';     // "hari ini" untuk jadwal input mengikuti WIB
+var MAKS_TANGGAL = 400;            // batas jumlah tanggal per cabang
 
 // true = judul sudah ada; false = sheet kosong (judul akan dibuat); lempar error jika isinya format lain
 function cekFormatSheet_(sheet) {
@@ -69,6 +72,93 @@ function waktu_(v) {
   return isNaN(t) ? 0 : t;
 }
 
+// ===== JADWAL INPUT PER CABANG (Time-Based Access Control) =====
+// Disimpan di Script Properties: "jadwal|cabang" -> { d:["yyyy-MM-dd",...], oleh, t }
+// Aturan: cabang HANYA boleh input (simpan & rekonsiliasi) pada tanggal yang tercantum. Tanpa tanggal = ditutup.
+function hariIni_() { return Utilities.formatDate(new Date(), TZ_AKSES, 'yyyy-MM-dd'); }
+function tglIndo_(s) { var p = String(s).split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+
+function tanggalValid_(s) {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  var p = s.split('-'), y = Number(p[0]), m = Number(p[1]), d = Number(p[2]);
+  var dt = new Date(Date.UTC(y, m - 1, d));
+  return y >= 2020 && y <= 2100 && dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+function bacaJadwal_(cabang) {
+  var raw = PropertiesService.getScriptProperties().getProperty('jadwal|' + cabang);
+  if (!raw) return { d: [], oleh: '', t: 0 };
+  try { var o = JSON.parse(raw); o.d = o.d || []; return o; } catch (e) { return { d: [], oleh: '', t: 0 }; }
+}
+
+function aksesCabang_(cabang) {
+  var h = hariIni_();
+  if (cabang === SHEET_UJI) return { terbuka: true, uji: true, hari_ini: h, jadwal: [] };
+  var j = bacaJadwal_(cabang);
+  return { terbuka: j.d.indexOf(h) >= 0, uji: false, hari_ini: h, jadwal: j.d };
+}
+
+// null = boleh; selain itu = objek error siap dikirim
+function wajibTerbuka_(user) {
+  var a = aksesCabang_(user.cabang);
+  if (a.terbuka) return null;
+  var berikut = a.jadwal.filter(function (x) { return x > a.hari_ini; })[0];
+  return { ok: false, code: 'TUTUP',
+    error: 'Input cabang ' + user.cabang.toUpperCase() + ' ditutup hari ini (' + tglIndo_(a.hari_ini) + '). ' +
+           (berikut ? 'Jadwal input berikutnya: ' + tglIndo_(berikut) + '.' : 'Belum ada jadwal input. Hubungi admin.') };
+}
+
+// Admin tidak menyentuh data cabang: semua operasinya diarahkan ke sheet tes_input.
+// Dengan "peran_uji" admin dapat berperan sebagai KASIR atau VERIFIKATOR (untuk menguji alur dua pihak).
+function efektif_(sesi, b) {
+  if (sesi.role !== 'ADMIN') return sesi;
+  var peran = String((b && b.peran_uji) || '').toUpperCase();
+  if (ROLE_VALID.indexOf(peran) >= 0) return { username: 'admin_' + peran.toLowerCase(), role: peran, cabang: SHEET_UJI, uji: true };
+  return { username: 'admin', role: 'ADMIN', cabang: SHEET_UJI, uji: true };
+}
+
+function jadwalGet_(sesi) {
+  if (sesi.role !== 'ADMIN') return { ok: false, error: 'Hanya admin yang dapat mengatur jadwal.' };
+  var out = {};
+  CABANG_VALID.forEach(function (c) { var j = bacaJadwal_(c); out[c] = { tanggal: j.d, oleh: j.oleh, t: j.t }; });
+  return { ok: true, jadwal: out, hari_ini: hariIni_(), cabang: CABANG_VALID };
+}
+
+function jadwalSet_(sesi, b) {
+  if (sesi.role !== 'ADMIN') return { ok: false, error: 'Hanya admin yang dapat mengatur jadwal.' };
+  var masuk = b.jadwal;
+  if (!masuk || typeof masuk !== 'object') return { ok: false, error: 'Data jadwal tidak valid.' };
+
+  var baru = {};
+  var cabangList = Object.keys(masuk);
+  for (var i = 0; i < cabangList.length; i++) {
+    var c = cabangList[i], arr = masuk[c];
+    if (CABANG_VALID.indexOf(c) < 0) return { ok: false, error: 'Cabang tidak valid: ' + c };
+    if (!Array.isArray(arr)) return { ok: false, error: 'Daftar tanggal ' + c + ' tidak valid.' };
+    if (arr.length > MAKS_TANGGAL) return { ok: false, error: 'Maksimal ' + MAKS_TANGGAL + ' tanggal per cabang.' };
+    var uniq = {};
+    for (var k = 0; k < arr.length; k++) {
+      if (!tanggalValid_(arr[k])) return { ok: false, error: 'Tanggal tidak valid pada ' + c + ': ' + arr[k] };
+      uniq[arr[k]] = true;
+    }
+    baru[c] = Object.keys(uniq).sort();
+  }
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var props = PropertiesService.getScriptProperties();
+    Object.keys(baru).forEach(function (c) {
+      var lama = bacaJadwal_(c).d;
+      if (JSON.stringify(lama) !== JSON.stringify(baru[c]))     // hanya cabang yang berubah yang dicatat
+        props.setProperty('jadwal|' + c, JSON.stringify({ d: baru[c], oleh: sesi.username, t: new Date().getTime() }));
+    });
+  } finally {
+    lock.releaseLock();
+  }
+  return jadwalGet_(sesi);
+}
+
 // ===== Pengajuan rekonsiliasi sementara (BELUM ditulis ke sheet) =====
 // Disimpan di Script Properties: kunci "rk|cabang|kode" -> { KASIR:{nilai,oleh,t}, VERIFIKATOR:{...}, tidakCocok:ms }
 function kunciRekon_(cabang, kode) { return 'rk|' + cabang + '|' + kode; }
@@ -87,11 +177,13 @@ function doPost(e) {
     var body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     switch (body.action) {
       case 'login':  return json_(login_(body));
-      case 'master': return json_(master_(requireSession_(body)));
-      case 'simpan': return json_(simpan_(requireSession_(body), body));
-      case 'rekap':  return json_(rekap_(requireSession_(body), body));
-      case 'notif':  return json_(notif_(requireSession_(body)));
-      case 'rekonsiliasi': return json_(rekonsiliasi_(requireSession_(body), body));
+      case 'master': return json_(master_(efektif_(requireSession_(body), body)));
+      case 'simpan': return json_(simpan_(efektif_(requireSession_(body), body), body));
+      case 'rekap':  return json_(rekap_(efektif_(requireSession_(body), body), body));
+      case 'notif':  return json_(notif_(efektif_(requireSession_(body), body)));
+      case 'rekonsiliasi': return json_(rekonsiliasi_(efektif_(requireSession_(body), body), body));
+      case 'jadwal_get': return json_(jadwalGet_(requireSession_(body)));
+      case 'jadwal_set': return json_(jadwalSet_(requireSession_(body), body));
       default:       return json_({ ok: false, error: 'Aksi tidak dikenal.' });
     }
   } catch (err) {
@@ -168,7 +260,9 @@ function master_(user) {
 
 function simpan_(user, b) {
   if (user.role !== 'KASIR' && user.role !== 'VERIFIKATOR')
-    return { ok: false, error: 'Akun Super User tidak bisa mencatat input. Login sebagai Kasir atau Verifikator.' };
+    return { ok: false, error: 'Pilih peran uji (Kasir atau Verifikator) terlebih dulu.' };
+  var tutup = wajibTerbuka_(user);          // jadwal input per cabang (admin/tes_input dikecualikan)
+  if (tutup) return tutup;
 
   var qty = parseInt(b.qty, 10);
   if (!(qty >= 1 && qty <= 100000)) return { ok: false, error: 'Jumlah tidak valid.' };
@@ -220,7 +314,7 @@ function simpan_(user, b) {
 
     hapusRekon_(user.cabang, kode);   // nilai berubah: pengajuan rekonsiliasi lama tidak berlaku lagi
     hapusCache_(user.cabang);
-    return { ok: true, total: total, message: 'Tersimpan di sheet ' + user.cabang + ' (' + user.role + ')' };
+    return { ok: true, total: total, sheet: user.cabang, message: 'Tersimpan di sheet ' + user.cabang + ' (' + user.role + ')' };
   } finally {
     lock.releaseLock();
   }
@@ -239,9 +333,9 @@ function barisAktifSemua_(rows) {
 }
 
 function rekap_(user, b) {
-  // Admin boleh memilih cabang; selain admin hanya cabangnya sendiri
-  var target = user.role === 'ADMIN' ? String(b.cabang || '').toLowerCase().trim() : user.cabang;
-  if (CABANG_VALID.indexOf(target) < 0) return { ok: false, error: 'Cabang tidak valid.' };
+  // Admin: HANYA sheet tes_input. Selain admin: hanya cabangnya sendiri (boleh diunduh kapan saja).
+  var target = user.uji ? SHEET_UJI : user.cabang;
+  if (target !== SHEET_UJI && CABANG_VALID.indexOf(target) < 0) return { ok: false, error: 'Cabang tidak valid.' };
 
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(target);
   if (!sheet || !cekFormatSheet_(sheet)) return { ok: true, data: [], cabang: target };
@@ -290,13 +384,17 @@ function hitungSelisih_(cabang) {
 }
 
 function notif_(user) {
-  if (user.role !== 'KASIR' && user.role !== 'VERIFIKATOR') return { ok: true, count: 0, items: [], menunggu: 0 };
   var cache = CacheService.getScriptCache();
   var key = 'notif_' + user.cabang;
   var hit = cache.get(key);
-  if (hit) return JSON.parse(hit);
-  var hasil = hitungSelisih_(user.cabang);
-  try { cache.put(key, JSON.stringify(hasil), NOTIF_CACHE_DETIK); } catch (e) { /* terlalu besar: lewati cache */ }
+  var hasil;
+  if (hit) {
+    hasil = JSON.parse(hit);
+  } else {
+    hasil = hitungSelisih_(user.cabang);
+    try { cache.put(key, JSON.stringify(hasil), NOTIF_CACHE_DETIK); } catch (e) { /* terlalu besar: lewati cache */ }
+  }
+  hasil.akses = aksesCabang_(user.cabang);    // status jadwal selalu dihitung segar (tidak ikut cache)
   return hasil;
 }
 
@@ -306,7 +404,9 @@ function notif_(user) {
 // Jika berbeda -> kedua pengajuan dibatalkan, sheet tidak berubah.
 function rekonsiliasi_(user, b) {
   if (user.role !== 'KASIR' && user.role !== 'VERIFIKATOR')
-    return { ok: false, error: 'Hanya Kasir atau Verifikator yang bisa melakukan pencocokan.' };
+    return { ok: false, error: 'Pilih peran uji (Kasir atau Verifikator) terlebih dulu.' };
+  var tutup = wajibTerbuka_(user);
+  if (tutup) return tutup;
 
   var nilai = parseInt(b.nilai, 10);
   if (!(nilai >= 0 && nilai <= 100000)) return { ok: false, error: 'Nilai tidak valid.' };

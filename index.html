@@ -409,6 +409,35 @@
     .notif-tag { display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600;
       background: var(--btn-secondary-bg); color: var(--btn-secondary-text); border: 1px solid var(--border-color); }
     .notif-tag.warn { background: var(--alert-bg); color: var(--alert); border-color: var(--alert-border); }
+    /* ===== Mode uji admin, status akses, jadwal ===== */
+    .admin-panel { background: var(--card-bg-sub); border: 1px solid var(--border-color); border-left: 4px solid var(--accent-line);
+      border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; }
+    .admin-title { font-size: 12px; font-weight: 700; letter-spacing: .3px; color: var(--accent-text); }
+    .admin-sub { font-size: 12px; color: var(--text-muted); margin: 3px 0 8px; line-height: 1.4; }
+    .peran-uji { display: flex; gap: 6px; }
+    .peran-uji button { flex: 1; min-height: 40px; border: 1px solid var(--border-strong); background: var(--input-bg);
+      color: var(--text-muted); border-radius: 10px; font-weight: 600; font-size: 13px; font-family: inherit; cursor: pointer; }
+    .peran-uji button.aktif { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+    .akses-bar { font-size: 12.5px; line-height: 1.4; border-radius: 10px; padding: 8px 11px; margin-bottom: 12px;
+      background: var(--card-bg-sub); color: var(--text-main); border: 1px solid var(--border-color); border-left: 4px solid var(--accent-line); }
+    .akses-bar.tutup { background: var(--alert-bg); color: var(--alert); border-color: var(--alert-border); border-left-color: var(--alert); font-weight: 600; }
+    .jadwal-cab { border: 1px solid var(--border-color); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; background: var(--card-bg-sub); }
+    .jadwal-cab h4 { margin: 0 0 6px; font-size: 13px; color: var(--text-main); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .jadwal-hariini { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--border-color);
+      background: var(--btn-secondary-bg); color: var(--btn-secondary-text); white-space: nowrap; }
+    .jadwal-hariini.tutup { background: var(--alert-bg); color: var(--alert); border-color: var(--alert-border); }
+    .jadwal-kosong { font-size: 12px; color: var(--text-muted); }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { display: inline-flex; align-items: center; gap: 2px; padding: 2px 3px 2px 9px; border-radius: 14px; font-size: 12px;
+      background: var(--btn-secondary-bg); color: var(--btn-secondary-text); border: 1px solid var(--border-color); }
+    .chip.hariini { border-color: var(--focus); font-weight: 700; }
+    .chip.lewat { opacity: .65; }
+    .chip button { border: none; background: transparent; color: inherit; cursor: pointer; font-size: 15px; line-height: 1; padding: 3px 7px; border-radius: 50%; font-family: inherit; }
+    .cab-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; margin: 4px 0 10px; }
+    .cab-check { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 5px 0; cursor: pointer; }
+    .cab-check input[type="checkbox"] { width: 18px; min-height: 18px; height: 18px; padding: 0; margin: 0; flex: 0 0 auto; }
+    .jadwal-warn { color: var(--alert); font-weight: 600; }
+    #jadwalModal { z-index: 2070; }
     #pilihModal { z-index: 2060; }
     #notifyModal { z-index: 2300; }
     #notifPanel { z-index: 2050; }
@@ -481,6 +510,19 @@
   </div>
 
   <div id="appSection" style="display: none;">
+    <!-- Admin: mode uji + pengaturan jadwal -->
+    <div class="admin-panel" id="adminPanel" style="display: none;">
+      <div class="admin-title">MODE UJI ADMIN · data masuk ke sheet tes_input</div>
+      <div class="admin-sub">Scan, input, lonceng, pencocokan, dan rekap semuanya memakai sheet <strong>tes_input</strong> dan tidak terkena jadwal. Ganti peran di bawah untuk menguji alur dua pihak sendirian.</div>
+      <div class="peran-uji" role="group" aria-label="Peran uji">
+        <button type="button" id="btnPeranKASIR" onclick="setPeranUji('KASIR')">Sebagai Kasir</button>
+        <button type="button" id="btnPeranVERIFIKATOR" onclick="setPeranUji('VERIFIKATOR')">Sebagai Verifikator</button>
+      </div>
+      <button class="btn btn-secondary" style="width: 100%; margin-top: 8px;" onclick="bukaJadwal()">📅 Atur Jadwal Input Cabang</button>
+    </div>
+    <!-- Kasir/Verifikator: status jadwal input cabang -->
+    <div class="akses-bar" id="aksesBar" style="display: none;">-</div>
+
     <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
       <button class="btn btn-primary" style="flex: 1 1 140px;" onclick="startScanner()">📷 Buka Kamera</button>
       <button class="btn btn-secondary" onclick="stopScanner()">Tutup</button>
@@ -513,6 +555,30 @@
         <input type="number" id="inputQty" placeholder="Jumlah Qty..." min="1" value="1" inputmode="numeric" pattern="[0-9]*" style="flex: 0.8;">
         <button class="btn btn-primary" id="btnSimpan" style="flex: 1.2;" onclick="simpanInputQty()">Simpan Input</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Jadwal input per cabang (admin) -->
+<div class="modal-overlay" id="jadwalModal">
+  <div class="modal-box wide">
+    <div class="modal-title" style="margin-bottom: 4px;">Jadwal Input Cabang</div>
+    <div class="panel-sub" id="jadwalSub">-</div>
+
+    <div class="recon-label">Tambah tanggal</div>
+    <div class="recon-row">
+      <div style="flex: 1;"><label class="recon-label" for="jdMulai">Mulai</label><input type="date" id="jdMulai" class="recon-field" style="margin-bottom: 6px;"></div>
+      <div style="flex: 1;"><label class="recon-label" for="jdSelesai">Sampai (opsional)</label><input type="date" id="jdSelesai" class="recon-field" style="margin-bottom: 6px;"></div>
+    </div>
+    <div class="recon-label">Berlaku untuk cabang</div>
+    <div class="cab-grid" id="jdCabList"></div>
+    <button class="btn btn-secondary" style="width: 100%; margin-bottom: 12px;" onclick="tambahTanggalJadwal()">+ Tambahkan ke cabang terpilih</button>
+
+    <div class="recon-label" style="margin-bottom: 6px;">Jadwal saat ini</div>
+    <div class="notif-list" id="jadwalList" style="max-height: 34vh;"></div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="tutupJadwal()">Tutup</button>
+      <button class="btn btn-primary" id="btnJadwalSimpan" onclick="simpanJadwal()">Simpan Jadwal</button>
     </div>
   </div>
 </div>
@@ -606,6 +672,25 @@
 
   // ---------- API (Google Apps Script sebagai backend) ----------
   // Content-Type text/plain sengaja dipakai agar tidak memicu preflight CORS.
+  // ---------- Peran & mode uji admin ----------
+  const PERAN_KEY = 'scanstock.peranuji';
+  let peranUji = 'KASIR';
+  try { const p = localStorage.getItem(PERAN_KEY); if (p === 'KASIR' || p === 'VERIFIKATOR') peranUji = p; } catch (e) {}
+  function isAdmin() { return !!currentUser && currentUser.role === 'ADMIN'; }
+  function peranAktif() { return isAdmin() ? peranUji : (currentUser ? currentUser.role : ''); }
+  const labelSheet = () => (isAdmin() ? 'TES_INPUT' : (currentUser ? currentUser.cabang.toUpperCase() : ''));
+
+  function tampilPeranUji() {
+    ['KASIR', 'VERIFIKATOR'].forEach(r => document.getElementById('btnPeran' + r).classList.toggle('aktif', r === peranUji));
+  }
+  function setPeranUji(p) {
+    peranUji = p;
+    try { localStorage.setItem(PERAN_KEY, p); } catch (e) {}
+    tampilPeranUji();
+    if (document.getElementById('notifPanel').style.display === 'flex') renderNotifList();
+    if (reconItem && document.getElementById('reconModal').style.display === 'flex') tampilkanStatusRecon();
+  }
+
   async function api(action, payload) {
     const url = getConfig().API_URL;
     if (!url) {
@@ -618,7 +703,7 @@
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(Object.assign({ action: action, token: session ? session.token : null }, payload || {})),
+        body: JSON.stringify(Object.assign({ action: action, token: session ? session.token : null, peran_uji: isAdmin() ? peranUji : undefined }, payload || {})),
         signal: ctrl.signal
       });
       const data = await res.json();
@@ -702,8 +787,10 @@
     document.getElementById('appSection').style.display = 'block';
     document.getElementById('userBar').style.display = 'flex';
     document.getElementById('currentUsername').innerText = currentUser.username;
-    document.getElementById('currentRole').innerText = currentUser.role + " (" + currentUser.cabang.toUpperCase() + ")";
-    document.getElementById('exportBranchSelect').style.display = (currentUser.role === 'ADMIN') ? 'inline-block' : 'none';
+    document.getElementById('currentRole').innerText = isAdmin() ? "ADMIN · MODE UJI (TES_INPUT)" : currentUser.role + " (" + currentUser.cabang.toUpperCase() + ")";
+    document.getElementById('exportBranchSelect').style.display = 'none';   // rekap admin selalu dari tes_input
+    document.getElementById('adminPanel').style.display = isAdmin() ? 'block' : 'none';
+    if (isAdmin()) tampilPeranUji();
     fetchMasterData();
     startPolling();
   }
@@ -722,6 +809,9 @@
     document.getElementById('dbStatus').innerText = "Silakan login untuk memuat data produk.";
     stopScanner();
     resetNotif();
+    document.getElementById('adminPanel').style.display = 'none';
+    document.getElementById('aksesBar').style.display = 'none';
+    aksesData = null; aksesTerbuka = true;
   }
 
   function tampilkanProduk(item) {
@@ -757,6 +847,7 @@
   async function simpanInputQty() {
     const qtyVal = parseInt(document.getElementById('inputQty').value) || 0;
     if (!activeItem) return;
+    if (!aksesTerbuka) return showModal("Input Ditutup", "Input cabang ini sedang ditutup menurut jadwal. Lihat keterangan di bagian atas layar.");
     if (qtyVal <= 0) return showModal("Peringatan", "Jumlah produk harus lebih dari 0.");
 
     const btn = document.getElementById('btnSimpan');
@@ -769,13 +860,13 @@
       document.getElementById('inputQty').value = 1;
       resumeScanner();
       pollNotif(true);
-      showModal("Berhasil Disimpan", `Tercatat (${currentUser.role}) +${qtyVal} Pcs ${activeItem.nama_produk} di ${currentUser.cabang.toUpperCase()}. Total input ${currentUser.role.toLowerCase()} untuk produk ini: ${res.total} Pcs.`);
+      showModal("Berhasil Disimpan", `Tercatat (${peranAktif()}) +${qtyVal} Pcs ${activeItem.nama_produk} di ${String(res.sheet || labelSheet()).toUpperCase()}. Total input ${peranAktif().toLowerCase()} untuk produk ini: ${res.total} Pcs.`);
     } catch (err) {
       if (handleAuthError(err)) return;
-      showModal("Gagal Menyimpan", err.message);
+      if (err.code === 'TUTUP') pollNotif(true);
+      showModal(err.code === 'TUTUP' ? "Input Ditutup" : "Gagal Menyimpan", err.message);
     } finally {
-      btn.innerText = "Simpan Input";
-      btn.disabled = false;
+      terapkanAkses(aksesData);
     }
   }
 
@@ -827,7 +918,7 @@
   }
 
   async function downloadDataRekap() {
-    const targetCabang = (currentUser.role === 'ADMIN') ? document.getElementById('exportBranchSelect').value : currentUser.cabang;
+    const targetCabang = isAdmin() ? 'tes_input' : currentUser.cabang;   // admin: hanya sheet tes_input
 
     try {
       const res = await api('rekap', { cabang: targetCabang });
@@ -1072,7 +1163,7 @@
   let reconItem = null, reconBusy = false;
 
   const rupiah = n => 'Rp ' + (Number(n) || 0).toLocaleString('id-ID');
-  const bellAllowed = () => !!currentUser && (currentUser.role === 'KASIR' || currentUser.role === 'VERIFIKATOR');
+  const bellAllowed = () => !!currentUser && (currentUser.role === 'KASIR' || currentUser.role === 'VERIFIKATOR' || currentUser.role === 'ADMIN');
 
   function startPolling() {
     stopPolling();
@@ -1092,7 +1183,7 @@
     notif = { count: 0, items: [], menunggu: 0, updated: null };
     notifSeen = false;
     reconItem = null;
-    ['notifPanel', 'reconModal', 'confirmModal', 'pilihModal'].forEach(id => document.getElementById(id).style.display = 'none');
+    ['notifPanel', 'reconModal', 'confirmModal', 'pilihModal', 'jadwalModal'].forEach(id => document.getElementById(id).style.display = 'none');
     const bell = document.getElementById('btnBell');
     bell.style.display = 'none';
     bell.classList.remove('has-alert', 'ring');
@@ -1118,6 +1209,8 @@
   function applyNotif(res) {
     const prev = notif.count;
     notif = { count: res.count || 0, items: res.items || [], menunggu: res.menunggu || 0, updated: new Date() };
+    aksesData = res.akses || null;
+    terapkanAkses(aksesData);
     renderBell(prev);
     if (document.getElementById('notifPanel').style.display === 'flex') renderNotifList();
     segarkanRecon();
@@ -1180,10 +1273,10 @@
   function renderNotifList() {
     const list = document.getElementById('notifList');
     list.textContent = '';
-    const cab = currentUser ? currentUser.cabang.toUpperCase() : '';
+    const cab = labelSheet();
     const upd = notif.updated ? notif.updated.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/\./g, ':') : '-';
     document.getElementById('notifSub').textContent =
-      `Cabang ${cab} · diperbarui ${upd} · urut dari selisih terlama · cek otomatis tiap ${Math.round(POLL_MS / 1000)} detik (POLL_SECONDS)`;
+      `${isAdmin() ? 'Sheet' : 'Cabang'} ${cab}${isAdmin() ? ' (mode uji, peran ' + namaPeran(peranUji) + ')' : ''} · diperbarui ${upd} · urut dari selisih terlama · cek otomatis tiap ${Math.round(POLL_MS / 1000)} detik (POLL_SECONDS)`;
 
     if (notif.items.length === 0) {
       const e = document.createElement('div');
@@ -1227,12 +1320,155 @@
     }
   }
 
+  // ---------- Status jadwal input (Kasir/Verifikator) ----------
+  let aksesData = null, aksesTerbuka = true;
+
+  function tglLabel(iso) {
+    const [y, m, d] = String(iso).split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('id-ID', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  function terapkanAkses(a) {
+    const bar = document.getElementById('aksesBar');
+    const btn = document.getElementById('btnSimpan');
+    if (!a || isAdmin()) {
+      aksesTerbuka = true;
+      bar.style.display = 'none';
+    } else {
+      aksesTerbuka = !!a.terbuka;
+      bar.style.display = 'block';
+      bar.className = 'akses-bar' + (a.terbuka ? '' : ' tutup');
+      if (a.terbuka) {
+        bar.textContent = `Input DIBUKA hari ini (${tglLabel(a.hari_ini)}).`;
+      } else {
+        const next = (a.jadwal || []).find(x => x > a.hari_ini);
+        bar.textContent = `Input DITUTUP hari ini (${tglLabel(a.hari_ini)}). ` + (next ? `Jadwal berikutnya: ${tglLabel(next)}.` : 'Belum ada jadwal input. Hubungi admin.');
+      }
+    }
+    btn.disabled = !aksesTerbuka;
+    btn.innerText = aksesTerbuka ? 'Simpan Input' : 'Input Ditutup';
+  }
+
+  // ---------- Jadwal input per cabang (admin) ----------
+  const NAMA_CABANG = { kranggan: 'Kranggan', katedral: 'Katedral', santamaria: 'Santa Maria', athanasius: 'Athanasius', antonius: 'Antonius', paulus: 'Paulus' };
+  let jadwal = {}, jadwalAsli = '{}', jadwalHariIni = '', jadwalPeringatan = false;
+  const jEl = id => document.getElementById(id);
+
+  function rentangTanggal(a, b) {
+    const out = [];
+    const [y1, m1, d1] = a.split('-').map(Number), [y2, m2, d2] = b.split('-').map(Number);
+    for (let t = Date.UTC(y1, m1 - 1, d1), end = Date.UTC(y2, m2 - 1, d2); t <= end; t += 86400000) out.push(new Date(t).toISOString().slice(0, 10));
+    return out;
+  }
+
+  async function bukaJadwal() {
+    try {
+      const res = await api('jadwal_get');
+      jadwal = {};
+      Object.keys(NAMA_CABANG).forEach(c => { jadwal[c] = ((res.jadwal[c] || {}).tanggal || []).slice(); });
+      jadwalAsli = JSON.stringify(jadwal);
+      jadwalHariIni = res.hari_ini;
+      jadwalPeringatan = false;
+      jEl('jadwalSub').textContent = `Kasir dan Verifikator hanya bisa input pada tanggal di bawah (waktu WIB). Cabang tanpa tanggal = input DITUTUP. Hari ini: ${tglLabel(jadwalHariIni)}. Mode uji admin (tes_input) tidak terkena jadwal.`;
+      jEl('jadwalSub').classList.remove('jadwal-warn');
+      jEl('jdMulai').value = ''; jEl('jdSelesai').value = '';
+      jEl('jdCabList').textContent = '';
+      Object.keys(NAMA_CABANG).forEach(c => {
+        const lb = document.createElement('label'); lb.className = 'cab-check';
+        const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = c; cb.id = 'jdc_' + c;
+        lb.append(cb, NAMA_CABANG[c]);
+        jEl('jdCabList').appendChild(lb);
+      });
+      renderJadwal();
+      jEl('jadwalModal').style.display = 'flex';
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      showModal("Gagal Memuat Jadwal", err.message);
+    }
+  }
+
+  function renderJadwal() {
+    const list = jEl('jadwalList');
+    list.textContent = '';
+    const asli = JSON.parse(jadwalAsli);
+    Object.keys(NAMA_CABANG).forEach(c => {
+      const box = document.createElement('div'); box.className = 'jadwal-cab';
+      const h = document.createElement('h4');
+      const nm = document.createElement('span');
+      nm.textContent = NAMA_CABANG[c] + (JSON.stringify(asli[c]) !== JSON.stringify(jadwal[c]) ? ' (belum disimpan)' : '');
+      const buka = jadwal[c].indexOf(jadwalHariIni) >= 0;
+      const st = document.createElement('span'); st.className = 'jadwal-hariini' + (buka ? '' : ' tutup'); st.textContent = buka ? 'Hari ini: BUKA' : 'Hari ini: TUTUP';
+      h.append(nm, st);
+      box.appendChild(h);
+      if (jadwal[c].length === 0) {
+        const e = document.createElement('div'); e.className = 'jadwal-kosong'; e.textContent = 'Belum ada tanggal. Input ditutup.';
+        box.appendChild(e);
+      } else {
+        const chips = document.createElement('div'); chips.className = 'chips';
+        jadwal[c].forEach(t => {
+          const chip = document.createElement('span');
+          chip.className = 'chip' + (t === jadwalHariIni ? ' hariini' : '') + (t < jadwalHariIni ? ' lewat' : '');
+          chip.append(tglLabel(t));
+          const x = document.createElement('button'); x.type = 'button'; x.textContent = '×'; x.setAttribute('aria-label', 'Hapus ' + tglLabel(t));
+          x.onclick = () => { jadwal[c] = jadwal[c].filter(v => v !== t); renderJadwal(); };
+          chip.appendChild(x);
+          chips.appendChild(chip);
+        });
+        box.appendChild(chips);
+      }
+      list.appendChild(box);
+    });
+  }
+
+  function tambahTanggalJadwal() {
+    const a = jEl('jdMulai').value, b = jEl('jdSelesai').value || a;
+    const cabs = Object.keys(NAMA_CABANG).filter(c => jEl('jdc_' + c).checked);
+    if (!a) return showModal("Tanggal Belum Diisi", "Pilih tanggal mulai terlebih dulu.");
+    if (b < a) return showModal("Rentang Tidak Valid", "Tanggal 'Sampai' tidak boleh sebelum tanggal 'Mulai'.");
+    if (a < jadwalHariIni) return showModal("Tanggal Sudah Lewat", "Tanggal yang sudah lewat tidak bisa ditambahkan, karena input hanya dinilai pada hari berjalan.");
+    const dates = rentangTanggal(a, b);
+    if (dates.length > 31) return showModal("Rentang Terlalu Panjang", "Maksimal 31 hari sekali tambah.");
+    if (cabs.length === 0) return showModal("Cabang Belum Dipilih", "Centang minimal satu cabang.");
+    cabs.forEach(c => { jadwal[c] = Array.from(new Set(jadwal[c].concat(dates))).sort(); });
+    jEl('jdMulai').value = ''; jEl('jdSelesai').value = '';
+    renderJadwal();
+  }
+
+  async function simpanJadwal() {
+    const btn = jEl('btnJadwalSimpan');
+    btn.disabled = true; btn.innerText = 'Menyimpan...';
+    try {
+      const res = await api('jadwal_set', { jadwal: jadwal });
+      Object.keys(NAMA_CABANG).forEach(c => { jadwal[c] = ((res.jadwal[c] || {}).tanggal || []).slice(); });
+      jadwalAsli = JSON.stringify(jadwal);
+      jadwalPeringatan = false;
+      jEl('jadwalSub').classList.remove('jadwal-warn');
+      renderJadwal();
+      showModal("Jadwal Tersimpan", "Jadwal input per cabang sudah diperbarui dan langsung berlaku.");
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      showModal("Gagal Menyimpan Jadwal", err.message);
+    } finally {
+      btn.disabled = false; btn.innerText = 'Simpan Jadwal';
+    }
+  }
+
+  function tutupJadwal() {
+    if (JSON.stringify(jadwal) !== jadwalAsli && !jadwalPeringatan) {
+      jadwalPeringatan = true;
+      jEl('jadwalSub').textContent = 'Ada perubahan yang BELUM disimpan. Tekan Simpan Jadwal, atau tekan Tutup sekali lagi untuk membuang perubahan.';
+      jEl('jadwalSub').classList.add('jadwal-warn');
+      return;
+    }
+    jEl('jadwalModal').style.display = 'none';
+  }
+
   // ---------- Pencocokan (dua pihak harus sepakat) ----------
   const namaPeran = r => (r === 'KASIR' ? 'Kasir' : 'Verifikator');
-  const peranLain = () => (currentUser.role === 'KASIR' ? 'VERIFIKATOR' : 'KASIR');
+  const peranLain = () => (peranAktif() === 'KASIR' ? 'VERIFIKATOR' : 'KASIR');
 
   function statusRekon(it) {
-    const saya = currentUser.role, lain = peranLain(), aj = it.ajukan || {};
+    const saya = peranAktif(), lain = peranLain(), aj = it.ajukan || {};
     if (aj[saya]) return { kelas: 'wait', tag: `Menunggu ${namaPeran(lain)}`,
       teks: `Anda sudah mengajukan. Menunggu ${namaPeran(lain)} mengisi nilai yang sama. Anda boleh mengirim ulang untuk mengubah nilai Anda.` };
     if (aj[lain]) return { kelas: '', tag: `${namaPeran(lain)} sudah mengajukan`,
@@ -1292,6 +1528,7 @@
 
   function mintaKonfirmasiRecon() {
     if (!reconItem) return;
+    if (!aksesTerbuka) return showModal("Input Ditutup", "Pencocokan juga dikunci di luar jadwal input cabang ini.");
     const raw = document.getElementById('reconNilai').value.trim();
     const n = Number(raw);
     if (raw === '' || !Number.isInteger(n) || n < 0 || n > 100000)
@@ -1341,7 +1578,8 @@
         document.getElementById('reconModal').style.display = 'none';
         reconItem = null;
       }
-      showModal(err.code === 'STALE' ? "Data Sudah Berubah" : "Gagal Menyimpan", err.message);
+      if (err.code === 'TUTUP') pollNotif(true);
+      showModal(err.code === 'STALE' ? "Data Sudah Berubah" : err.code === 'TUTUP' ? "Input Ditutup" : "Gagal Menyimpan", err.message);
     } finally {
       reconBusy = false;
       yes.disabled = false; yes.innerText = 'Ya, Simpan';
