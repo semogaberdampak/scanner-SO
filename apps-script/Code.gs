@@ -14,7 +14,7 @@
 
 // ===== PENGATURAN =====
 // var PIN_DEFAULT = '';          // PIN Kasir & Verifikator semua cabang
-// var PIN_ADMIN_DEFAULT = ''; // PIN Super User (admin) saja          // Disarankan: isi Script Properties APP_PIN agar PIN tidak ada di kode
+// var PIN_ADMIN_DEFAULT = '; // PIN Super User (admin) saja          // Disarankan: isi Script Properties APP_PIN agar PIN tidak ada di kode
 var SESSION_SECONDS = 1 * 60 * 60;   // 6 jam (batas maksimum CacheService)
 var CABANG_VALID = ['kranggan', 'katedral', 'santamaria', 'athanasius', 'antonius', 'paulus'];
 var ROLE_VALID = ['KASIR', 'VERIFIKATOR'];
@@ -181,6 +181,7 @@ function doPost(e) {
       case 'simpan': return json_(simpan_(efektif_(requireSession_(body), body), body));
       case 'rekap':  return json_(rekap_(efektif_(requireSession_(body), body), body));
       case 'notif':  return json_(notif_(efektif_(requireSession_(body), body)));
+      case 'snd':    return json_(snd_(efektif_(requireSession_(body), body), body));
       case 'rekonsiliasi': return json_(rekonsiliasi_(efektif_(requireSession_(body), body), body));
       case 'jadwal_get': return json_(jadwalGet_(requireSession_(body)));
       case 'jadwal_set': return json_(jadwalSet_(requireSession_(body), body));
@@ -347,6 +348,39 @@ function rekap_(user, b) {
     return { produk_id: kode, nama_produk: r[1], harga: r[2], qty_kasir: Number(r[3]) || 0, qty_verifikator: Number(r[5]) || 0 };
   });
   return { ok: true, data: out, cabang: target };
+}
+
+// ===== INPUT SnD: filter produk per supplier (HANYA BACA, tidak menyimpan apa pun) =====
+// Kode supplier = karakter ke-5 dan ke-6 dari kode produk (mis. 1123LB0001 -> "LB").
+// Hanya produk yang jumlahnya sudah VALID: kedua peran sudah input dan nilainya sama
+// (hasil pencocokan, atau memang sama sejak awal). Khusus Kasir.
+function snd_(user, b) {
+  if (user.role !== 'KASIR') return { ok: false, error: 'Fitur Input SnD hanya untuk Kasir.' };
+  var kode2 = String(b.kode2 || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{2}$/.test(kode2)) return { ok: false, error: 'Isi tepat 2 karakter (huruf atau angka).' };
+
+  var kosong = { ok: true, kode2: kode2, items: [], belum: 0, total_pcs: 0 };
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(user.cabang);
+  if (!sheet || !cekFormatSheet_(sheet)) return kosong;
+
+  var p = barisAktifSemua_(sheet.getDataRange().getValues());
+  var items = [], belum = 0, total = 0;
+  p.urutan.forEach(function (kode) {
+    if (kode.length < 6 || kode.substr(4, 2).toUpperCase() !== kode2) return;
+    var r = p.aktif[kode];
+    var k = Number(r[3]) || 0, v = Number(r[5]) || 0;
+    if (waktu_(r[4]) && waktu_(r[6]) && k === v) {
+      items.push({
+        produk_id: kode, nama_produk: r[1], harga: r[2], jumlah: k,
+        status: String(r[7] || '').indexOf('REKONSILIASI') === 0 ? 'REKONSILIASI' : 'COCOK'
+      });
+      total += k;
+    } else {
+      belum++;     // masih selisih atau baru satu pihak: belum FIX/VALID
+    }
+  });
+  items.sort(function (a, b) { return a.produk_id < b.produk_id ? -1 : a.produk_id > b.produk_id ? 1 : 0; });
+  return { ok: true, kode2: kode2, items: items, belum: belum, total_pcs: total };
 }
 
 // ===== NOTIFIKASI SELISIH =====

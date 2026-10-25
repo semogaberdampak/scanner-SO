@@ -24,6 +24,7 @@
   <meta name="apple-mobile-web-app-title" content="Scan Stock">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <script src="vendor/html5-qrcode.min.js"></script>
+  <script src="vendor/qrcode.js"></script>
   <script>
     // Cadangan: dipakai bila config.js gagal dimuat (cache lama, pemblokir, dll.).
     // Nilai di config.js tetap diutamakan kalau valid.
@@ -437,6 +438,31 @@
     .cab-check { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 5px 0; cursor: pointer; }
     .cab-check input[type="checkbox"] { width: 18px; min-height: 18px; height: 18px; padding: 0; margin: 0; flex: 0 0 auto; }
     .jadwal-warn { color: var(--alert); font-weight: 600; }
+    /* ===== Input SnD (filter produk per supplier) ===== */
+    .snd-input { text-align: center; font-size: 26px !important; font-weight: 800; letter-spacing: 10px; text-transform: uppercase; }
+    .snd-summary { font-size: 12.5px; line-height: 1.45; margin: 0 0 10px; padding: 8px 10px; border-radius: 10px;
+      background: var(--btn-secondary-bg); color: var(--btn-secondary-text); border: 1px solid var(--border-color); }
+    .snd-item { display: flex; gap: 10px; align-items: flex-start; width: 100%; box-sizing: border-box; padding: 10px; border-radius: 10px;
+      background: var(--card-bg-sub); color: var(--text-main); border: 1px solid var(--border-color); border-left: 4px solid var(--accent-line); }
+    .snd-main { flex: 1 1 auto; min-width: 0; }
+    .snd-kode { font-size: 14px; font-weight: 700; letter-spacing: .3px; word-break: break-all; }
+    .snd-kode mark { background: var(--btn-secondary-bg); color: var(--text-main); border-radius: 3px; padding: 0 2px; outline: 1px solid var(--focus); }
+    .snd-nama { font-size: 12px; color: var(--text-muted); margin-top: 2px; line-height: 1.3; }
+    .snd-side { flex: 0 0 auto; text-align: right; }
+    .snd-qty { font-size: 19px; font-weight: 800; line-height: 1.1; }
+    .snd-qty small { font-size: 11px; font-weight: 600; color: var(--text-muted); }
+    .snd-harga { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .snd-pageinfo { font-size: 12px; color: var(--text-muted); text-align: center; margin-bottom: 8px; }
+    .snd-item.klik { cursor: pointer; transition: border-color .15s, transform .08s; }
+    .snd-item.klik:hover { border-color: var(--focus); border-left-color: var(--accent-line); }
+    .snd-item.klik:active { transform: scale(0.99); }
+    .snd-item.klik:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+    /* QR: selalu hitam di atas putih (apa pun tema) agar mudah dipindai */
+    .qr-box { background: #FFFFFF; padding: 14px; border-radius: 16px; box-sizing: border-box;
+      width: min(80vw, 80vh, 440px); box-shadow: 0 10px 40px rgba(0,0,0,0.45); }
+    .qr-box svg { display: block; width: 100%; height: auto; }
+    #qrModal { z-index: 2058; }
+    #sndModal { z-index: 2055; }
     #jadwalModal { z-index: 2070; }
     #pilihModal { z-index: 2060; }
     #notifyModal { z-index: 2300; }
@@ -467,7 +493,7 @@
 
   <div class="user-bar" id="userBar" style="display: none;">
     <div>User: <strong id="currentUsername">-</strong> (<span class="role-badge" id="currentRole">-</span>)</div>
-    <div style="display: flex; gap: 6px; align-items: center;">
+    <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
       <select id="exportBranchSelect" style="display: none; width: auto; min-height: 34px; padding: 2px 6px; font-size: 12px;">
         <option value="kranggan">Kranggan</option>
         <option value="katedral">Katedral</option>
@@ -477,6 +503,7 @@
         <option value="paulus">Paulus</option>
       </select>
       <button class="btn btn-secondary" style="min-height: 34px; padding: 4px 10px; font-size: 12px;" onclick="downloadDataRekap()">📥 Rekap</button>
+      <button class="btn btn-secondary" id="btnSnd" style="display: none; min-height: 34px; padding: 4px 10px; font-size: 12px;" onclick="bukaSnd()">Input SnD</button>
       <button class="btn btn-secondary" style="min-height: 34px; padding: 4px 10px; font-size: 12px;" onclick="logout()">Logout</button>
     </div>
   </div>
@@ -557,6 +584,30 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- Input SnD: filter produk per supplier (hanya tampilan) -->
+<div class="modal-overlay" id="sndModal">
+  <div class="modal-box wide">
+    <div class="modal-title" style="margin-bottom: 4px;">Input SnD</div>
+    <div class="panel-sub">Filter produk per supplier: ketik 2 karakter (huruf/angka) yang sama dengan karakter ke-5 dan ke-6 kode produk. Hanya produk dengan jumlah yang sudah valid. Ketuk salah satu produk untuk menampilkan QR kode produknya. Tampilan saja, tidak ada data yang disimpan.</div>
+    <label class="recon-label" for="sndKode">Kode supplier (2 karakter)</label>
+    <input type="text" id="sndKode" class="recon-field snd-input" maxlength="2" placeholder="LB" inputmode="text"
+           autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" oninput="sndInput(this)">
+    <div class="snd-summary" id="sndSummary">Ketik 2 karakter kode supplier, misalnya LB atau 00.</div>
+    <div class="notif-list" id="sndList" style="max-height: 40vh;"></div>
+    <div class="snd-pageinfo" id="sndPageInfo" style="display: none;"></div>
+    <div class="btn-row" id="sndPager" style="display: none; margin-bottom: 8px;">
+      <button class="btn btn-secondary" id="sndPrev" onclick="sndHalaman(-1)">‹ Sebelumnya</button>
+      <button class="btn btn-secondary" id="sndNext" onclick="sndHalaman(1)">Berikutnya ›</button>
+    </div>
+    <button class="btn btn-secondary" style="width: 100%;" onclick="tutupSnd()">Tutup</button>
+  </div>
+</div>
+
+<!-- QR kode produk: hanya QR. Ketuk area kosong untuk menutup -->
+<div class="modal-overlay" id="qrModal" role="dialog" aria-modal="true" aria-label="QR kode produk" onclick="qrKlik(event)">
+  <div class="qr-box" id="qrBox"></div>
 </div>
 
 <!-- Jadwal input per cabang (admin) -->
@@ -687,6 +738,8 @@
     peranUji = p;
     try { localStorage.setItem(PERAN_KEY, p); } catch (e) {}
     tampilPeranUji();
+    tampilkanTombolSnd();
+    if (peranAktif() !== 'KASIR') { tutupQr(); tutupSnd(); }
     if (document.getElementById('notifPanel').style.display === 'flex') renderNotifList();
     if (reconItem && document.getElementById('reconModal').style.display === 'flex') tampilkanStatusRecon();
   }
@@ -791,6 +844,7 @@
     document.getElementById('exportBranchSelect').style.display = 'none';   // rekap admin selalu dari tes_input
     document.getElementById('adminPanel').style.display = isAdmin() ? 'block' : 'none';
     if (isAdmin()) tampilPeranUji();
+    tampilkanTombolSnd();
     fetchMasterData();
     startPolling();
   }
@@ -811,6 +865,7 @@
     resetNotif();
     document.getElementById('adminPanel').style.display = 'none';
     document.getElementById('aksesBar').style.display = 'none';
+    document.getElementById('btnSnd').style.display = 'none';
     aksesData = null; aksesTerbuka = true;
   }
 
@@ -1183,7 +1238,7 @@
     notif = { count: 0, items: [], menunggu: 0, updated: null };
     notifSeen = false;
     reconItem = null;
-    ['notifPanel', 'reconModal', 'confirmModal', 'pilihModal', 'jadwalModal'].forEach(id => document.getElementById(id).style.display = 'none');
+    ['notifPanel', 'reconModal', 'confirmModal', 'pilihModal', 'jadwalModal', 'sndModal', 'qrModal'].forEach(id => document.getElementById(id).style.display = 'none');
     const bell = document.getElementById('btnBell');
     bell.style.display = 'none';
     bell.classList.remove('has-alert', 'ring');
@@ -1348,6 +1403,179 @@
     btn.disabled = !aksesTerbuka;
     btn.innerText = aksesTerbuka ? 'Simpan Input' : 'Input Ditutup';
   }
+
+  // ---------- Input SnD: filter produk per supplier (khusus Kasir, hanya tampilan) ----------
+  const SND_PER_HAL = 20;
+  const SND_HINT = 'Ketik 2 karakter kode supplier, misalnya LB atau 00.';
+  let sndData = { items: [], belum: 0, total_pcs: 0, kode2: '' };
+  let sndHal = 1, sndSeq = 0;
+  const sEl = id => document.getElementById(id);
+
+  function tampilkanTombolSnd() {
+    sEl('btnSnd').style.display = (currentUser && peranAktif() === 'KASIR') ? '' : 'none';
+  }
+
+  function sndKosongkan(teks) {
+    sEl('sndList').textContent = '';
+    sEl('sndPageInfo').style.display = 'none';
+    sEl('sndPager').style.display = 'none';
+    sEl('sndSummary').textContent = teks;
+  }
+
+  function bukaSnd() {
+    if (peranAktif() !== 'KASIR') return;
+    sndSeq++;
+    sEl('sndKode').value = '';
+    sndKosongkan(SND_HINT);
+    sEl('sndModal').style.display = 'flex';
+    setTimeout(() => sEl('sndKode').focus(), 50);
+  }
+
+  function tutupSnd() { sndSeq++; sEl('sndModal').style.display = 'none'; }
+
+  function sndInput(inp) {
+    inp.value = inp.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 2);
+    sndSeq++;                                         // batalkan permintaan yang masih berjalan
+    if (inp.value.length < 2) return sndKosongkan(SND_HINT);
+    muatSnd(inp.value);
+  }
+
+  async function muatSnd(k2) {
+    const my = ++sndSeq;
+    sndKosongkan(`Memuat produk supplier ${k2}...`);
+    try {
+      const res = await api('snd', { kode2: k2 });
+      if (my !== sndSeq) return;                      // sudah ada ketikan yang lebih baru
+      sndData = res; sndHal = 1;
+      renderSnd();
+    } catch (err) {
+      if (my !== sndSeq) return;
+      if (handleAuthError(err)) return;
+      sndKosongkan('Gagal memuat: ' + err.message);
+    }
+  }
+
+  function renderSnd() {
+    const items = sndData.items || [];
+    const total = items.length, k2 = sndData.kode2;
+    const fmt = n => (Number(n) || 0).toLocaleString('id-ID');
+    const belum = sndData.belum ? ` · ${fmt(sndData.belum)} produk lain belum valid (masih selisih atau menunggu pasangan)` : '';
+    const list = sEl('sndList');
+    list.textContent = '';
+
+    if (total === 0) {
+      sEl('sndSummary').textContent = `Supplier ${k2}: belum ada produk dengan jumlah valid${belum}.`;
+      sEl('sndPageInfo').style.display = 'none';
+      sEl('sndPager').style.display = 'none';
+      return;
+    }
+    sEl('sndSummary').textContent = `Supplier ${k2}: ${fmt(total)} produk valid · total ${fmt(sndData.total_pcs)} Pcs${belum}`;
+
+    const pages = Math.ceil(total / SND_PER_HAL);
+    sndHal = Math.min(Math.max(sndHal, 1), pages);
+    const awal = (sndHal - 1) * SND_PER_HAL;
+    items.slice(awal, awal + SND_PER_HAL).forEach(it => {
+      const row = document.createElement('div'); row.className = 'snd-item klik';
+      row.tabIndex = 0;
+      row.setAttribute('role', 'button');
+      row.setAttribute('aria-label', 'Tampilkan QR kode produk ' + it.produk_id);
+      row.onclick = () => bukaQr(String(it.produk_id).trim());
+      row.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bukaQr(String(it.produk_id).trim()); } };
+      const main = document.createElement('div'); main.className = 'snd-main';
+      const kd = document.createElement('div'); kd.className = 'snd-kode';
+      const kode = String(it.produk_id);
+      const hit = document.createElement('mark'); hit.textContent = kode.substr(4, 2);
+      kd.append(kode.substr(0, 4), hit, kode.substr(6));
+      const nm = document.createElement('div'); nm.className = 'snd-nama'; nm.textContent = it.nama_produk;
+      const tg = document.createElement('span'); tg.className = 'notif-tag'; tg.textContent = it.status === 'REKONSILIASI' ? 'Hasil pencocokan' : 'Cocok';
+      main.append(kd, nm, tg);
+
+      const side = document.createElement('div'); side.className = 'snd-side';
+      const q = document.createElement('div'); q.className = 'snd-qty';
+      const sm = document.createElement('small'); sm.textContent = ' Pcs';
+      q.append(fmt(it.jumlah), sm);
+      const hg = document.createElement('div'); hg.className = 'snd-harga';
+      hg.textContent = Number(it.harga) > 0 ? 'Rp ' + fmt(it.harga) : '–';
+      side.append(q, hg);
+
+      row.append(main, side);
+      list.appendChild(row);
+    });
+    list.scrollTop = 0;
+
+    const dari = awal + 1, sampai = Math.min(awal + SND_PER_HAL, total);
+    const info = sEl('sndPageInfo');
+    info.textContent = `Menampilkan ${dari}–${sampai} dari ${fmt(total)} · Halaman ${sndHal} dari ${pages}`;
+    info.style.display = 'block';
+    sEl('sndPager').style.display = 'flex';
+    sEl('sndPrev').disabled = sndHal <= 1;
+    sEl('sndNext').disabled = sndHal >= pages;
+  }
+
+  function sndHalaman(delta) { sndHal += delta; renderSnd(); }
+
+  // ---------- QR kode produk (hanya QR; ketuk area kosong untuk menutup) ----------
+  let qrDibukaPada = 0;
+
+  // QR dibuat sebagai SVG: tajam di ukuran berapa pun, hitam di atas putih, dengan zona tenang 4 modul
+  function buatQrSvg(teks) {
+    if (typeof qrcode === 'undefined') throw new Error('Pustaka QR belum termuat. Muat ulang halaman.');
+    qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'] || qrcode.stringToBytes;
+    const qr = qrcode(0, 'Q');            // versi otomatis, koreksi kesalahan Q (25%) agar tahan silau
+    qr.addData(teks);
+    qr.make();
+    const n = qr.getModuleCount(), tepi = 4, sisi = n + tepi * 2;
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${sisi} ${sisi}`);
+    svg.setAttribute('shape-rendering', 'crispEdges');
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', 'QR kode produk ' + teks);
+    const bg = document.createElementNS(NS, 'rect');
+    bg.setAttribute('width', sisi); bg.setAttribute('height', sisi); bg.setAttribute('fill', '#FFFFFF');
+    let d = '';
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        if (!qr.isDark(r, c)) continue;
+        let len = 1;
+        while (c + len < n && qr.isDark(r, c + len)) len++;
+        d += `M${c + tepi} ${r + tepi}h${len}v1h-${len}z`;
+        c += len - 1;
+      }
+    }
+    const path = document.createElementNS(NS, 'path');
+    path.setAttribute('d', d); path.setAttribute('fill', '#000000');
+    svg.append(bg, path);
+    return svg;
+  }
+
+  function bukaQr(kode) {
+    const box = document.getElementById('qrBox');
+    box.textContent = '';
+    try {
+      box.appendChild(buatQrSvg(kode));
+    } catch (err) {
+      return showModal("QR Gagal Dibuat", err.message);
+    }
+    qrDibukaPada = Date.now();
+    document.getElementById('qrModal').style.display = 'flex';
+  }
+
+  function tutupQr() {
+    document.getElementById('qrModal').style.display = 'none';
+    document.getElementById('qrBox').textContent = '';
+  }
+
+  // Hanya klik pada AREA KOSONG (latar gelap) yang menutup; mengetuk QR-nya sendiri tidak menutup.
+  function qrKlik(e) {
+    if (e.target !== e.currentTarget) return;
+    if (Date.now() - qrDibukaPada < 250) return;      // abaikan ketukan ikutan saat baru dibuka
+    tutupQr();
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('qrModal').style.display === 'flex') tutupQr();
+  });
 
   // ---------- Jadwal input per cabang (admin) ----------
   const NAMA_CABANG = { kranggan: 'Kranggan', katedral: 'Katedral', santamaria: 'Santa Maria', athanasius: 'Athanasius', antonius: 'Antonius', paulus: 'Paulus' };

@@ -1,12 +1,13 @@
 // Service worker: menyimpan "cangkang" aplikasi agar cepat terbuka & bisa di-install.
 // Data (API Apps Script) TIDAK di-cache, selalu diambil langsung dari server.
-const CACHE = 'scanstock-v8';
+const CACHE = 'scanstock-v10';
 const ASSETS = [
   './',
   'index.html',
   'config.js',
   'manifest.webmanifest',
   'vendor/html5-qrcode.min.js',
+  'vendor/qrcode.js',
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/apple-touch-icon.png'
