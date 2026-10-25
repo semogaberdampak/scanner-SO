@@ -400,6 +400,15 @@
     .pick-kode mark { background: var(--btn-secondary-bg); color: var(--text-main); border-radius: 3px; padding: 0 2px; outline: 1px solid var(--focus); }
     .pick-nama { font-size: 12px; color: var(--text-muted); margin-top: 2px; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     .pick-harga { flex: 0 0 auto; font-size: 12px; font-weight: 600; text-align: right; }
+    /* ===== Status pengajuan rekonsiliasi ===== */
+    .recon-note { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; line-height: 1.4; }
+    .recon-status { font-size: 12.5px; line-height: 1.4; border-radius: 10px; padding: 9px 11px; margin-bottom: 12px;
+      background: var(--card-bg-sub); color: var(--text-main); border: 1px solid var(--border-color); border-left: 4px solid var(--accent-line); }
+    .recon-status.wait { background: var(--btn-secondary-bg); color: var(--btn-secondary-text); }
+    .recon-status.warn { background: var(--alert-bg); color: var(--alert); border-color: var(--alert-border); border-left-color: var(--alert); }
+    .notif-tag { display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600;
+      background: var(--btn-secondary-bg); color: var(--btn-secondary-text); border: 1px solid var(--border-color); }
+    .notif-tag.warn { background: var(--alert-bg); color: var(--alert); border-color: var(--alert-border); }
     #pilihModal { z-index: 2060; }
     #notifyModal { z-index: 2300; }
     #notifPanel { z-index: 2050; }
@@ -485,7 +494,7 @@
     <div id="reader-file" style="display: none;"></div>
 
     <form onsubmit="cariManual(event)" class="input-group">
-      <input type="text" id="barcodeInput" placeholder="Scan Barcode / ketik kode" autofocus autocomplete="off">
+      <input type="text" id="barcodeInput" placeholder="Scan / ketik kode (boleh sebagian)..." autofocus autocomplete="off">
       <button type="submit" class="btn btn-primary" style="flex: 0 0 auto;">Cari</button>
     </form>
 
@@ -536,6 +545,7 @@
 <div class="modal-overlay" id="reconModal">
   <div class="modal-box wide">
     <div class="modal-title">Pencocokan Selisih</div>
+    <div class="recon-note">Kasir dan Verifikator masing-masing mengisi nilai yang disepakati. Data di sheet baru berubah setelah keduanya mengisi nilai yang sama.</div>
     <div class="prod-id" id="reconKode">-</div>
     <div class="prod-title" id="reconNama" style="margin-bottom: 6px;">-</div>
     <div class="recon-row">
@@ -545,7 +555,8 @@
       <div class="recon-box"><div class="recon-label">Input Kasir</div><div class="recon-value" id="reconKasir">-</div></div>
       <div class="recon-box"><div class="recon-label">Input Verifikator</div><div class="recon-value" id="reconVerif">-</div></div>
     </div>
-    <label class="recon-label" for="reconNilai">Nilai valid hasil pencocokan (Pcs)</label>
+    <div class="recon-status" id="reconStatus">-</div>
+    <label class="recon-label" for="reconNilai">Nilai yang disepakati (Pcs)</label>
     <input type="number" id="reconNilai" class="recon-field" min="0" step="1" inputmode="numeric" pattern="[0-9]*" placeholder="Masukkan nilai yang disepakati...">
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="closeRecon()">Batal</button>
@@ -1109,6 +1120,7 @@
     notif = { count: res.count || 0, items: res.items || [], menunggu: res.menunggu || 0, updated: new Date() };
     renderBell(prev);
     if (document.getElementById('notifPanel').style.display === 'flex') renderNotifList();
+    segarkanRecon();
   }
 
   function renderBell(prev) {
@@ -1191,6 +1203,13 @@
       const nm = document.createElement('div'); nm.className = 'notif-name'; nm.textContent = it.nama_produk;
       const mt = document.createElement('div'); mt.className = 'notif-meta'; mt.textContent = `${it.produk_id} · sejak ${jamLabel(it.sejak)}`;
       main.append(nm, mt);
+      const st = statusRekon(it);
+      if (st.tag) {
+        const tg = document.createElement('span');
+        tg.className = 'notif-tag' + (st.kelas === 'warn' ? ' warn' : '');
+        tg.textContent = st.tag;
+        main.appendChild(tg);
+      }
       const side = document.createElement('div'); side.className = 'notif-side';
       const kv = document.createElement('div'); kv.textContent = `K ${it.qty_kasir} · V ${it.qty_verifikator}`;
       const df = document.createElement('span'); df.className = 'notif-diff'; df.textContent = (diff > 0 ? '+' : '') + diff;
@@ -1208,7 +1227,48 @@
     }
   }
 
-  // ---------- Pencocokan ----------
+  // ---------- Pencocokan (dua pihak harus sepakat) ----------
+  const namaPeran = r => (r === 'KASIR' ? 'Kasir' : 'Verifikator');
+  const peranLain = () => (currentUser.role === 'KASIR' ? 'VERIFIKATOR' : 'KASIR');
+
+  function statusRekon(it) {
+    const saya = currentUser.role, lain = peranLain(), aj = it.ajukan || {};
+    if (aj[saya]) return { kelas: 'wait', tag: `Menunggu ${namaPeran(lain)}`,
+      teks: `Anda sudah mengajukan. Menunggu ${namaPeran(lain)} mengisi nilai yang sama. Anda boleh mengirim ulang untuk mengubah nilai Anda.` };
+    if (aj[lain]) return { kelas: '', tag: `${namaPeran(lain)} sudah mengajukan`,
+      teks: `${namaPeran(lain)} sudah mengajukan nilai. Isi nilai yang Anda sepakati. Jika sama, data di sheet langsung diperbarui.` };
+    if (it.tidak_cocok) return { kelas: 'warn', tag: 'Tidak cocok, isi ulang',
+      teks: `Pengajuan terakhir tidak sama (${jamLabel(it.tidak_cocok).split(' · ')[0]}). Kedua pengajuan dibatalkan. Diskusikan, lalu kedua pihak mengisi ulang.` };
+    return { kelas: '', tag: '', teks: 'Belum ada pengajuan. Diskusikan nilainya, lalu kedua pihak mengisi nilai yang sama.' };
+  }
+
+  function tampilkanStatusRecon() {
+    const st = statusRekon(reconItem);
+    const el = document.getElementById('reconStatus');
+    el.className = 'recon-status' + (st.kelas ? ' ' + st.kelas : '');
+    el.textContent = st.teks;
+  }
+
+  // Dipanggil tiap polling: perbarui status di modal yang sedang terbuka, atau tutup jika selisih sudah selesai
+  function segarkanRecon() {
+    if (!reconItem || reconBusy || document.getElementById('reconModal').style.display !== 'flex') return;
+    const baru = notif.items.find(x => x.produk_id === reconItem.produk_id);
+    if (!baru) {
+      document.getElementById('reconModal').style.display = 'none';
+      document.getElementById('confirmModal').style.display = 'none';
+      reconItem = null;
+      return showModal("Selisih Sudah Selesai", "Produk ini sudah tidak selisih. Kemungkinan pencocokan sudah selesai atau nilainya berubah.");
+    }
+    if (baru.qty_kasir !== reconItem.qty_kasir || baru.qty_verifikator !== reconItem.qty_verifikator) {
+      document.getElementById('reconModal').style.display = 'none';
+      document.getElementById('confirmModal').style.display = 'none';
+      reconItem = null;
+      return showModal("Data Sudah Berubah", "Nilai kasir atau verifikator untuk produk ini baru saja berubah. Buka ulang dari daftar notifikasi.");
+    }
+    reconItem = baru;
+    tampilkanStatusRecon();
+  }
+
   function openRecon(i) {
     const it = notif.items[i];
     if (!it) return;
@@ -1219,6 +1279,7 @@
     document.getElementById('reconKasir').textContent = it.qty_kasir + ' Pcs';
     document.getElementById('reconVerif').textContent = it.qty_verifikator + ' Pcs';
     document.getElementById('reconNilai').value = '';
+    tampilkanStatusRecon();
     document.getElementById('reconModal').style.display = 'flex';
     setTimeout(() => document.getElementById('reconNilai').focus(), 50);
   }
@@ -1235,8 +1296,13 @@
     const n = Number(raw);
     if (raw === '' || !Number.isInteger(n) || n < 0 || n > 100000)
       return showModal("Nilai Belum Valid", "Isi nilai hasil pencocokan dengan bilangan bulat 0 atau lebih.");
+    const lain = namaPeran(peranLain());
+    const sudah = (reconItem.ajukan || {})[peranLain()];
     document.getElementById('confirmText').textContent =
-      `Nilai ${n} Pcs akan MENGGANTIKAN input kasir (${reconItem.qty_kasir}) dan verifikator (${reconItem.qty_verifikator}) untuk "${reconItem.nama_produk}". Data awal tetap tersimpan di sheet sebagai riwayat.`;
+      `Anda mengajukan nilai ${n} Pcs untuk "${reconItem.nama_produk}" sebagai nilai yang disepakati. ` +
+      (sudah
+        ? `${lain} sudah mengajukan. Jika nilainya sama, data di sheet langsung diperbarui dan menggantikan input kasir (${reconItem.qty_kasir}) serta verifikator (${reconItem.qty_verifikator}). Jika berbeda, kedua pengajuan dibatalkan dan harus diisi ulang.`
+        : `Data di sheet baru diperbarui setelah ${lain} mengajukan nilai yang sama.`);
     document.getElementById('confirmModal').style.display = 'flex';
   }
 
@@ -1252,12 +1318,21 @@
     const yes = document.getElementById('btnReconYa');
     reconBusy = true; yes.disabled = true; yes.innerText = 'Menyimpan...';
     try {
-      await api('rekonsiliasi', { produk_id: it.produk_id, nilai: nilai, lihat_kasir: it.qty_kasir, lihat_verifikator: it.qty_verifikator });
+      const res = await api('rekonsiliasi', { produk_id: it.produk_id, nilai: nilai, lihat_kasir: it.qty_kasir, lihat_verifikator: it.qty_verifikator });
       reconBusy = false;
       document.getElementById('confirmModal').style.display = 'none';
       document.getElementById('reconModal').style.display = 'none';
       reconItem = null;
-      showModal("Pencocokan Tersimpan", `${it.nama_produk}: nilai valid ${nilai} Pcs sudah menggantikan input kasir dan verifikator.`);
+      const lain = namaPeran(peranLain());
+      if (res.status === 'selesai') {
+        showModal("Pencocokan Selesai", `${it.nama_produk}: nilai ${nilai} Pcs disepakati kedua pihak dan sudah diperbarui di sheet.`);
+      } else if (res.status === 'menunggu') {
+        showModal("Pengajuan Tersimpan", `Nilai ${nilai} Pcs tercatat sementara. Data di sheet BELUM berubah. Menunggu ${lain} mengajukan nilai yang sama.`);
+      } else if (res.status === 'beda') {
+        showModal("Nilai Tidak Sama", `Nilai Anda tidak sama dengan pengajuan ${lain}. Kedua pengajuan dibatalkan dan data di sheet tidak berubah. Diskusikan, lalu kedua pihak mengisi ulang.`);
+      } else {
+        showModal("Pengajuan Diproses", "Status pengajuan tidak dikenali. Muat ulang daftar notifikasi untuk melihat keadaan terbaru.");
+      }
     } catch (err) {
       reconBusy = false;
       document.getElementById('confirmModal').style.display = 'none';

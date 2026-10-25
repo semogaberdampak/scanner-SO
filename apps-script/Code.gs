@@ -13,8 +13,9 @@
  */
 
 // ===== PENGATURAN =====
-// var PIN_DEFAULT = '';          // Disarankan: isi Script Properties APP_PIN agar PIN tidak ada di kode
-var SESSION_SECONDS = 2 * 60 * 60;   // 2 jam (batas maksimum CacheService)
+var PIN_DEFAULT = '123456';          // PIN Kasir & Verifikator semua cabang
+var PIN_ADMIN_DEFAULT = '123admin456'; // PIN Super User (admin) saja          // Disarankan: isi Script Properties APP_PIN agar PIN tidak ada di kode
+var SESSION_SECONDS = 6 * 60 * 60;   // 6 jam (batas maksimum CacheService)
 var CABANG_VALID = ['kranggan', 'katedral', 'santamaria', 'athanasius', 'antonius', 'paulus'];
 var ROLE_VALID = ['KASIR', 'VERIFIKATOR'];
 
@@ -67,6 +68,12 @@ function waktu_(v) {
   var t = new Date(v).getTime();
   return isNaN(t) ? 0 : t;
 }
+
+// ===== Pengajuan rekonsiliasi sementara (BELUM ditulis ke sheet) =====
+// Disimpan di Script Properties: kunci "rk|cabang|kode" -> { KASIR:{nilai,oleh,t}, VERIFIKATOR:{...}, tidakCocok:ms }
+function kunciRekon_(cabang, kode) { return 'rk|' + cabang + '|' + kode; }
+function hapusRekon_(cabang, kode) { PropertiesService.getScriptProperties().deleteProperty(kunciRekon_(cabang, kode)); }
+function jam_(ms) { return Utilities.formatDate(new Date(ms), Session.getScriptTimeZone(), 'dd/MM HH:mm'); }
 
 function hapusCache_(cabang) { CacheService.getScriptCache().remove('notif_' + cabang); }
 
@@ -211,6 +218,7 @@ function simpan_(user, b) {
       total = qty;
     }
 
+    hapusRekon_(user.cabang, kode);   // nilai berubah: pengajuan rekonsiliasi lama tidak berlaku lagi
     hapusCache_(user.cabang);
     return { ok: true, total: total, message: 'Tersimpan di sheet ' + user.cabang + ' (' + user.role + ')' };
   } finally {
@@ -257,13 +265,22 @@ function hitungSelisih_(cabang) {
   if (String(sheet.getRange(1, 1).getValue()).trim().toLowerCase() !== HEADER[0]) return kosong;
 
   var p = barisAktifSemua_(sheet.getDataRange().getValues());
+  var semua = PropertiesService.getScriptProperties().getProperties();
   var items = [], menunggu = 0;
   p.urutan.forEach(function (kode) {
     var r = p.aktif[kode];
     var tk = waktu_(r[4]), tv = waktu_(r[6]);
     var k = Number(r[3]) || 0, v = Number(r[5]) || 0;
     if (tk && tv) {
-      if (k !== v) items.push({ produk_id: kode, nama_produk: r[1], harga: r[2], qty_kasir: k, qty_verifikator: v, sejak: Math.max(tk, tv) });
+      if (k !== v) {
+        var rec = semua[kunciRekon_(cabang, kode)];
+        var pj = rec ? JSON.parse(rec) : {};
+        items.push({
+          produk_id: kode, nama_produk: r[1], harga: r[2], qty_kasir: k, qty_verifikator: v, sejak: Math.max(tk, tv),
+          ajukan: { KASIR: !!pj.KASIR, VERIFIKATOR: !!pj.VERIFIKATOR },   // hanya ADA/TIDAK, bukan nilainya
+          tidak_cocok: pj.tidakCocok || 0
+        });
+      }
     } else if (tk || tv) {
       menunggu++;   // baru diinput satu pihak: belum dihitung sebagai selisih
     }
@@ -284,8 +301,9 @@ function notif_(user) {
 }
 
 // ===== PENCOCOKAN (REKONSILIASI) =====
-// Baris awal TIDAK diubah nilainya (hanya diberi warna + keterangan). Satu baris rekonsiliasi disisipkan
-// tepat di bawahnya berisi nilai valid untuk kasir & verifikator. Rekap/notifikasi membaca baris terakhir.
+// Kasir DAN Verifikator masing-masing mengajukan nilai yang disepakati. Selama baru satu pihak, sheet TIDAK berubah.
+// Jika kedua nilai sama -> baris awal diberi warna (nilai tidak diubah) + satu baris REKONSILIASI disisipkan di bawahnya.
+// Jika berbeda -> kedua pengajuan dibatalkan, sheet tidak berubah.
 function rekonsiliasi_(user, b) {
   if (user.role !== 'KASIR' && user.role !== 'VERIFIKATOR')
     return { ok: false, error: 'Hanya Kasir atau Verifikator yang bisa melakukan pencocokan.' };
@@ -308,6 +326,7 @@ function rekonsiliasi_(user, b) {
     var cur = sheet.getRange(row, 1, 1, 7).getValues()[0];
     var k = Number(cur[3]) || 0, v = Number(cur[5]) || 0;
     if (!waktu_(cur[4]) || !waktu_(cur[6]) || k === v) {
+      hapusRekon_(user.cabang, kode);
       hapusCache_(user.cabang);
       return { ok: false, code: 'STALE', error: 'Produk ini sudah tidak selisih. Daftar notifikasi akan diperbarui.' };
     }
@@ -317,8 +336,34 @@ function rekonsiliasi_(user, b) {
       return { ok: false, code: 'STALE', error: 'Nilai produk ini baru saja berubah (kasir ' + k + ', verifikator ' + v + '). Buka ulang dari daftar notifikasi.' };
     }
 
+    var props = PropertiesService.getScriptProperties();
+    var key = kunciRekon_(user.cabang, kode);
+    var raw = props.getProperty(key);
+    var rec = raw ? JSON.parse(raw) : {};
     var now = new Date();
-    var ket = 'REKONSILIASI | oleh ' + user.username + ' | awal: kasir ' + k + ', verifikator ' + v + ' | nilai valid ' + nilai;
+    var lain = user.role === 'KASIR' ? 'VERIFIKATOR' : 'KASIR';
+
+    delete rec.tidakCocok;                                   // putaran baru
+    rec[user.role] = { nilai: nilai, oleh: user.username, t: now.getTime() };
+
+    // (a) Pihak lain belum mengajukan: simpan sementara, sheet tidak berubah
+    if (!rec[lain]) {
+      props.setProperty(key, JSON.stringify(rec));
+      hapusCache_(user.cabang);
+      return { ok: true, status: 'menunggu', menunggu: lain, nilai: nilai };
+    }
+
+    // (b) Kedua pihak sudah mengajukan tetapi nilainya berbeda: batalkan keduanya, sheet tidak berubah
+    if (Number(rec[lain].nilai) !== nilai) {
+      props.setProperty(key, JSON.stringify({ tidakCocok: now.getTime() }));
+      hapusCache_(user.cabang);
+      return { ok: true, status: 'beda', menunggu: lain };
+    }
+
+    // (c) Nilai sama: baru sekarang ditulis ke sheet
+    var ket = 'REKONSILIASI | disepakati kasir (' + rec.KASIR.oleh + ', ' + jam_(rec.KASIR.t) + ') & verifikator (' +
+              rec.VERIFIKATOR.oleh + ', ' + jam_(rec.VERIFIKATOR.t) + ') | awal: kasir ' + k + ', verifikator ' + v +
+              ' | nilai valid ' + nilai;
 
     sheet.insertRowAfter(row);
     var baru = row + 1;
@@ -333,8 +378,9 @@ function rekonsiliasi_(user, b) {
     var ketLama = String(sheet.getRange(row, COL_KET).getValue()).trim();
     sheet.getRange(row, COL_KET).setValue((ketLama ? ketLama + ' | ' : '') + 'SELISIH (diganti baris rekonsiliasi di bawahnya)');
 
+    props.deleteProperty(key);
     hapusCache_(user.cabang);
-    return { ok: true, message: 'Pencocokan tersimpan.', nilai: nilai };
+    return { ok: true, status: 'selesai', nilai: nilai };
   } finally {
     lock.releaseLock();
   }
