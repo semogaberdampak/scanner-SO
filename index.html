@@ -267,11 +267,19 @@
 
     .entry-form { 
       display: flex; 
-      gap: 8px; 
+      flex-direction: column; 
+      gap: 10px; 
       background: var(--bg-card); 
-      padding: 8px; 
+      padding: 12px; 
       border-radius: 10px; 
       border: 1px solid var(--border-color); 
+    }
+    /* Tombol simpan lebih tinggi untuk membedakan dari tombol kategori */
+    .entry-form #btnSimpan {
+      padding: 24px 16px !important;
+      font-size: 18px !important;
+      font-weight: 700 !important;
+      margin-top: 8px !important;
     }
     .status-text { font-size: 12px; text-align: center; color: var(--text-muted); margin-bottom: 10px; }
 
@@ -320,8 +328,6 @@
     @media (max-width: 380px) {
       .container { border-radius: 12px; }
       .price-qty-row { flex-wrap: wrap; gap: 6px; }
-      .entry-form { flex-wrap: wrap; }
-      .entry-form input, .entry-form .btn { flex: 1 1 100% !important; }
     }
 
     /* ===== Lonceng notifikasi ===== */
@@ -609,7 +615,7 @@
       </div>
 
       <div class="entry-form" id="entryForm">
-        <input type="number" id="inputQty" placeholder="0" min="1" value="1" inputmode="numeric" pattern="[0-9]*" style="width: 100%; font-size: 20px; padding: 14px 12px; margin-bottom: 8px; border-radius: 10px;">
+        <input type="number" id="inputQty" placeholder="0" min="" value="" inputmode="numeric" pattern="[0-9]*" style="width: 100%; font-size: 20px; padding: 14px 12px; margin-bottom: 8px; border-radius: 10px;">
         <div id="inputKategori" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px;">
           <button type="button" class="btn btn-secondary" style="width: 100%; padding: 14px 12px; font-size: 16px;" onclick="pilihKategoriInput('KANISIUS')">Kanisius</button>
           <button type="button" class="btn btn-secondary" style="width: 100%; padding: 14px 12px; font-size: 16px;" onclick="pilihKategoriInput('NON_KANISIUS')">Non Kanisius</button>
