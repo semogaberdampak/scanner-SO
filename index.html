@@ -206,6 +206,7 @@
       border-radius: 10px; 
       font-size: 16px; /* Mencegah Auto-Zoom di iOS Safari */
       outline: none; 
+      appearance: none;
       -webkit-appearance: none;
     }
     input:focus, select:focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--focus-ring); }
@@ -379,7 +380,7 @@
       font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center;
     }
     .notif-main { flex: 1 1 auto; min-width: 0; }
-    .notif-name { font-size: 13px; font-weight: 600; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .notif-name { font-size: 13px; font-weight: 600; line-height: 1.3; overflow: hidden; display: -webkit-box; line-clamp: 2; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     .notif-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
     .notif-side { flex: 0 0 auto; text-align: right; font-size: 12px; }
     .notif-diff { display: inline-block; margin-top: 3px; padding: 1px 8px; border-radius: 10px; font-weight: 700;
@@ -405,7 +406,7 @@
     .pick-main { flex: 1 1 auto; min-width: 0; }
     .pick-kode { font-size: 14px; font-weight: 700; letter-spacing: .3px; }
     .pick-kode mark { background: var(--btn-secondary-bg); color: var(--text-main); border-radius: 3px; padding: 0 2px; outline: 1px solid var(--focus); }
-    .pick-nama { font-size: 12px; color: var(--text-muted); margin-top: 2px; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .pick-nama { font-size: 12px; color: var(--text-muted); margin-top: 2px; line-height: 1.3; overflow: hidden; display: -webkit-box; line-clamp: 2; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     .pick-harga { flex: 0 0 auto; font-size: 12px; font-weight: 600; text-align: right; }
     /* ===== Status pengajuan rekonsiliasi ===== */
     .recon-note { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; line-height: 1.4; }
@@ -621,7 +622,7 @@
           <button type="button" class="btn btn-secondary" style="width: 100%; padding: 14px 12px; font-size: 16px;" onclick="pilihKategoriInput('NON_KANISIUS')">Non Kanisius</button>
           <button type="button" class="btn btn-secondary" style="width: 100%; padding: 14px 12px; font-size: 16px;" onclick="pilihKategoriInput('EKSTERNAL')">Eksternal</button>
         </div>
-        <button class="btn btn-primary" id="btnSimpan" style="width: 100%; padding: 22px 12px; font-size: 18px; margin-top: 6px; onclick="simpanInputQty()">Simpan Input</button>
+        <button class="btn btn-primary" id="btnSimpan" style="width: 100%; padding: 22px 12px; font-size: 18px; margin-top: 6px;" onclick="simpanInputQty()">Simpan Input</button>
       </div>
     </div>
   </div>
