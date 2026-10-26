@@ -461,6 +461,12 @@
     .qr-box { background: #FFFFFF; padding: 14px; border-radius: 16px; box-sizing: border-box;
       width: min(80vw, 80vh, 440px); box-shadow: 0 10px 40px rgba(0,0,0,0.45); }
     .qr-box svg { display: block; width: 100%; height: auto; }
+    /* ===== Kategori produk (checklist Buku Kanisius) ===== */
+    .kat-box { background: var(--card-bg-sub); border: 1px solid var(--border-color); border-left: 4px solid var(--accent-line);
+      border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; }
+    .kat-check { display: flex; align-items: center; gap: 10px; min-height: 34px; font-size: 14px; font-weight: 700; cursor: pointer; color: var(--text-main); }
+    .kat-check input[type="checkbox"] { width: 22px; height: 22px; min-height: 22px; padding: 0; margin: 0; flex: 0 0 auto; accent-color: var(--accent); }
+    .kat-note { font-size: 11.5px; line-height: 1.4; color: var(--text-muted); margin-top: 2px; }
     #qrModal { z-index: 2058; }
     #sndModal { z-index: 2055; }
     #jadwalModal { z-index: 2070; }
@@ -570,6 +576,15 @@
     <div id="resultCard" class="card-result">
       <div class="prod-id" id="resId">-</div>
       <div class="prod-title" id="resTitle">-</div>
+
+      <!-- Kategori: kode numerik 10 digit = checklist Buku Kanisius; alfanumerik = Eksternal (otomatis) -->
+      <div class="kat-box" id="kategoriBox" style="display: none;">
+        <label class="kat-check" id="katCekWrap" for="katKanisius">
+          <input type="checkbox" id="katKanisius" onchange="katUbah()">
+          <span>Buku Kanisius</span>
+        </label>
+        <div class="kat-note" id="katNote">-</div>
+      </div>
 
       <div class="price-qty-row">
         <div>
@@ -869,6 +884,69 @@
     aksesData = null; aksesTerbuka = true;
   }
 
+  // ---------- Kategori produk ----------
+  // numerik 10 digit  -> checklist: dicentang = "Buku Kanisius", tidak dicentang = "Buku non Kanisius"
+  // alfanumerik 10    -> "Eksternal" (otomatis, tanpa checklist)
+  const KAT_KANISIUS = 'Buku Kanisius';
+  let katDisentuh = false;   // pilihan dikirim ke server HANYA jika petugas benar-benar mengubah centang
+  let katSeq = 0;
+
+  function jenisKode(kode) {
+    if (/^[0-9]{10}$/.test(kode)) return 'NUMERIK';
+    if (/^[A-Za-z0-9]{10}$/.test(kode)) return 'ALFANUMERIK';
+    return 'LAIN';
+  }
+
+  function katUbah() {
+    katDisentuh = true;
+    document.getElementById('katNote').textContent = document.getElementById('katKanisius').checked
+      ? 'Akan disimpan sebagai: Buku Kanisius.'
+      : 'Akan disimpan sebagai: Buku non Kanisius (tidak dicentang).';
+  }
+
+  function terapkanKategoriKartu(item) {
+    const box = document.getElementById('kategoriBox');
+    const wrap = document.getElementById('katCekWrap');
+    const cb = document.getElementById('katKanisius');
+    const note = document.getElementById('katNote');
+    const kode = String(item.produk_id).trim();
+    const jenis = jenisKode(kode);
+    katDisentuh = false;
+    const seq = ++katSeq;
+    cb.checked = false;
+    if (jenis === 'NUMERIK') {
+      box.style.display = 'block'; wrap.style.display = 'flex';
+      note.textContent = 'Tidak dicentang = Buku non Kanisius. Memuat kategori tercatat...';
+      muatKategori(kode, seq);
+    } else if (jenis === 'ALFANUMERIK') {
+      box.style.display = 'block'; wrap.style.display = 'none';
+      note.textContent = 'Kategori: Eksternal (kode alfanumerik, otomatis).';
+    } else {
+      box.style.display = 'none';
+    }
+  }
+
+  // Menampilkan kategori yang SUDAH tercatat di sheet agar petugas melihat keadaan sebenarnya
+  async function muatKategori(kode, seq) {
+    const cb = document.getElementById('katKanisius'), note = document.getElementById('katNote');
+    try {
+      const res = await api('kategori', { produk_id: kode });
+      if (seq !== katSeq) return;                       // sudah berganti produk
+      if (katDisentuh) {
+        if (res.kategori) note.textContent += ` (tercatat sebelumnya: ${res.kategori})`;
+        return;
+      }
+      cb.checked = res.kategori === KAT_KANISIUS;
+      note.textContent = !res.ada ? 'Produk baru di sheet ini. Tidak dicentang = Buku non Kanisius.'
+        : res.kategori ? `Tercatat: ${res.kategori}. Ubah centang hanya jika ingin menggantinya.`
+        : 'Kategori belum tercatat. Tidak dicentang = Buku non Kanisius.';
+    } catch (err) {
+      if (seq !== katSeq) return;
+      if (handleAuthError(err)) return;
+      note.textContent = 'Kategori tercatat tidak bisa dimuat. Jika centang tidak diubah, kategori yang sudah ada tidak berubah.';
+    }
+  }
+
   function tampilkanProduk(item) {
     const card = document.getElementById('resultCard');
     activeItem = item;
@@ -877,6 +955,7 @@
     document.getElementById('resPrice').innerText = "Rp " + Number(item.harga).toLocaleString('id-ID');
     card.className = "card-result";
     card.style.display = "block";
+    terapkanKategoriKartu(item);
     if (!isScanning) document.getElementById('inputQty').focus();
     card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
@@ -887,6 +966,8 @@
     document.getElementById('resId').innerText = "Kode dicari: " + kode;
     document.getElementById('resTitle').innerText = "Produk Tidak Ditemukan";
     document.getElementById('resPrice').innerText = "Rp 0";
+    katSeq++;
+    document.getElementById('kategoriBox').style.display = 'none';
     card.className = "card-result error";
     card.style.display = "block";
   }
@@ -911,11 +992,20 @@
 
     try {
       // Cabang, role, user, nama & harga ditentukan server dari sesi dan sheet Master
-      const res = await api('simpan', { produk_id: activeItem.produk_id, qty: qtyVal });
+      const payload = { produk_id: activeItem.produk_id, qty: qtyVal };
+      if (jenisKode(String(activeItem.produk_id).trim()) === 'NUMERIK' && katDisentuh)
+        payload.kanisius = document.getElementById('katKanisius').checked;
+      const res = await api('simpan', payload);
       document.getElementById('inputQty').value = 1;
+      if (res.kategori && jenisKode(String(activeItem.produk_id).trim()) === 'NUMERIK') {
+        // perbarui tampilan sesuai yang benar-benar tersimpan
+        katDisentuh = false;
+        document.getElementById('katKanisius').checked = res.kategori === KAT_KANISIUS;
+        document.getElementById('katNote').textContent = `Tercatat: ${res.kategori}. Ubah centang hanya jika ingin menggantinya.`;
+      }
       resumeScanner();
       pollNotif(true);
-      showModal("Berhasil Disimpan", `Tercatat (${peranAktif()}) +${qtyVal} Pcs ${activeItem.nama_produk} di ${String(res.sheet || labelSheet()).toUpperCase()}. Total input ${peranAktif().toLowerCase()} untuk produk ini: ${res.total} Pcs.`);
+      showModal("Berhasil Disimpan", `Tercatat (${peranAktif()}) +${qtyVal} Pcs ${activeItem.nama_produk} di ${String(res.sheet || labelSheet()).toUpperCase()}. Total input ${peranAktif().toLowerCase()} untuk produk ini: ${res.total} Pcs.${res.kategori ? ' Kategori: ' + res.kategori + '.' : ''}`);
     } catch (err) {
       if (handleAuthError(err)) return;
       if (err.code === 'TUTUP') pollNotif(true);
