@@ -457,6 +457,29 @@
     .snd-item.klik:hover { border-color: var(--focus); border-left-color: var(--accent-line); }
     .snd-item.klik:active { transform: scale(0.99); }
     .snd-item.klik:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+    /* ===== Input SnD Kategori & Metode (baru) ===== */
+    .snd-kategori-wrapper { display: none; margin-top: 10px; animation: rollDown 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    @keyframes rollDown {
+      from { transform: translateY(-20px); opacity: 0; }
+      to   { transform: translateY(0); opacity: 1; }
+    }
+    .snd-kategori-btn { width: 100%; min-height: 44px; padding: 10px 14px; margin-bottom: 8px; border-radius: 10px;
+      background: var(--accent); color: var(--on-accent); font-size: 15px; font-weight: 700; letter-spacing: 0.3px;
+      border: none; cursor: pointer; text-align: center; transition: background 0.15s, transform 0.08s; }
+    .snd-kategori-btn:hover { background: var(--accent-hover); }
+    .snd-kategori-btn:active { transform: scale(0.98); }
+    .snd-kategori-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+    .snd-metode-modal .modal-box { max-width: 92vw; }
+    .snd-metode-modal .modal-title { margin-bottom: 8px; }
+    .snd-metode-modal .panel-sub { margin-bottom: 12px; }
+
+    .snd-ribbon { position: absolute; top: -6px; right: -6px; width: 28px; height: 28px; border-radius: 50%;
+      background: var(--accent); color: var(--on-accent); font-size: 13px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+      z-index: 5; animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    .snd-item { position: relative; }
+
     /* QR: selalu hitam di atas putih (apa pun tema) agar mudah dipindai */
     .qr-box { background: #FFFFFF; padding: 14px; border-radius: 16px; box-sizing: border-box;
       width: min(80vw, 80vh, 440px); box-shadow: 0 10px 40px rgba(0,0,0,0.45); }
@@ -469,6 +492,7 @@
     .kat-note { font-size: 11.5px; line-height: 1.4; color: var(--text-muted); margin-top: 2px; }
     #qrModal { z-index: 2058; }
     #sndModal { z-index: 2055; }
+    #sndMetodeModal { z-index: 2056; }
     #jadwalModal { z-index: 2070; }
     #pilihModal { z-index: 2060; }
     #notifyModal { z-index: 2300; }
@@ -606,6 +630,14 @@
   <div class="modal-box wide">
     <div class="modal-title" style="margin-bottom: 4px;">Input SnD</div>
     <div class="panel-sub">Filter produk per supplier: ketik 2 karakter (huruf/angka) yang sama dengan karakter ke-5 dan ke-6 kode produk. Hanya produk dengan jumlah yang sudah valid. Ketuk salah satu produk untuk menampilkan QR kode produknya. Tampilan saja, tidak ada data yang disimpan.</div>
+    
+    <!-- 3 Tombol Kategori (roll-down) -->
+    <div id="sndKategoriWrapper" class="snd-kategori-wrapper">
+      <button type="button" class="snd-kategori-btn" onclick="pilihKategori('KANISIUS')">Buku Kanisius</button>
+      <button type="button" class="snd-kategori-btn" onclick="pilihKategori('NON_KANISIUS')">Buku Non Kanisius</button>
+      <button type="button" class="snd-kategori-btn" onclick="pilihKategori('EKSTERNAL')">Eksternal</button>
+    </div>
+
     <label class="recon-label" for="sndKode">Kode supplier (2 karakter)</label>
     <input type="text" id="sndKode" class="recon-field snd-input" maxlength="2" placeholder="LB" inputmode="text"
            autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" oninput="sndInput(this)">
@@ -623,6 +655,17 @@
 <!-- QR kode produk: hanya QR. Ketuk area kosong untuk menutup -->
 <div class="modal-overlay" id="qrModal" role="dialog" aria-modal="true" aria-label="QR kode produk" onclick="qrKlik(event)">
   <div class="qr-box" id="qrBox"></div>
+</div>
+
+<!-- Metode Scan (pilih QR / QR+Jumlah) -->
+<div class="modal-overlay snd-metode-modal" id="sndMetodeModal">
+  <div class="modal-box wide">
+    <div class="modal-title">Pilih Metode Scan</div>
+    <div class="panel-sub">Kategori: <strong id="sndMetodeKategori">-</strong></div>
+    <button type="button" class="btn btn-primary" style="width: 100%;" onclick="pilihMetode('QR')">Metode Scan QR</button>
+    <button type="button" class="btn btn-secondary" style="width: 100%; margin-top: 8px;" onclick="pilihMetode('QR_JUMLAH')">Metode Scan QR + Jumlah</button>
+    <button type="button" class="btn btn-secondary" style="width: 100%; margin-top: 8px;" onclick="tutupSndMetode()">Batal</button>
+  </div>
 </div>
 
 <!-- Jadwal input per cabang (admin) -->
@@ -1501,6 +1544,12 @@
   let sndHal = 1, sndSeq = 0;
   const sEl = id => document.getElementById(id);
 
+  // State baru untuk kategori & metode
+  let sndKlikSet = new Set();       // produk_id yang sudah diklik (ribbon)
+  let sndKategoriTerpilih = null;   // 'KANISIUS' | 'NON_KANISIUS' | 'EKSTERNAL'
+  let sndMetodeTerpilih = null;     // 'QR' | 'QR_JUMLAH'
+  let sndProductMap = new Map();    // kode -> { produk_id, nama_produk, harga, jumlah }
+
   function tampilkanTombolSnd() {
     sEl('btnSnd').style.display = (currentUser && peranAktif() === 'KASIR') ? '' : 'none';
   }
@@ -1516,18 +1565,106 @@
     if (peranAktif() !== 'KASIR') return;
     sndSeq++;
     sEl('sndKode').value = '';
-    sndKosongkan(SND_HINT);
+    // Sembunyikan input supplier & daftar, tampilkan 3 tombol kategori
+    sEl('sndKode').style.display = 'none';
+    sEl('sndKode').previousElementSibling.style.display = 'none'; // label
+    sEl('sndSummary').style.display = 'none';
+    sEl('sndList').style.display = 'none';
+    sEl('sndPageInfo').style.display = 'none';
+    sEl('sndPager').style.display = 'none';
+    sEl('sndKategoriWrapper').style.display = 'block';
     sEl('sndModal').style.display = 'flex';
-    setTimeout(() => sEl('sndKode').focus(), 50);
   }
 
-  function tutupSnd() { sndSeq++; sEl('sndModal').style.display = 'none'; }
+  function tutupSnd() { 
+    sndSeq++; 
+    sEl('sndModal').style.display = 'none'; 
+    // Reset state
+    sndKategoriTerpilih = null;
+    sndMetodeTerpilih = null;
+    sndKlikSet.clear();
+    sndProductMap.clear();
+    // Sembunyikan kategori wrapper, tampilkan input supplier kembali
+    sEl('sndKategoriWrapper').style.display = 'none';
+    sEl('sndKode').style.display = '';
+    sEl('sndKode').previousElementSibling.style.display = '';
+    sEl('sndSummary').style.display = '';
+    sEl('sndList').style.display = '';
+  }
 
   function sndInput(inp) {
     inp.value = inp.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 2);
     sndSeq++;                                         // batalkan permintaan yang masih berjalan
     if (inp.value.length < 2) return sndKosongkan(SND_HINT);
     muatSnd(inp.value);
+  }
+
+  // --- Fungsi baru untuk kategori & metode ---
+  function pilihKategori(kat) {
+    sndKategoriTerpilih = kat;
+    sEl('sndMetodeKategori').textContent = 
+      kat === 'KANISIUS' ? 'Buku Kanisius' :
+      kat === 'NON_KANISIUS' ? 'Buku Non Kanisius' : 'Eksternal';
+    sEl('sndMetodeModal').style.display = 'flex';
+  }
+
+  function pilihMetode(metode) {
+    sndMetodeTerpilih = metode;
+    sEl('sndMetodeModal').style.display = 'none';
+    
+    if (sndKategoriTerpilih === 'KANISIUS') {
+      // Buku Kanisius: otomatis muat daftar produk dari rekap (kasir=verifikator), sort asc
+      muatSndKanisius();
+    } else {
+      // Non Kanisius & Eksternal: tampilkan input supplier dengan hint yang sesuai
+      sEl('sndKode').style.display = '';
+      sEl('sndKode').previousElementSibling.style.display = '';
+      sEl('sndSummary').style.display = '';
+      sEl('sndList').style.display = '';
+      const katLabel = sndKategoriTerpilih === 'NON_KANISIUS' ? 'Buku Non Kanisius' : 'Eksternal';
+      sEl('sndSummary').textContent = `${katLabel}: ketik 2 karakter kode supplier (karakter ke-5 & 6 kode produk).`;
+      setTimeout(() => sEl('sndKode').focus(), 50);
+    }
+  }
+
+  function tutupSndMetode() {
+    sEl('sndMetodeModal').style.display = 'none';
+    // Kembali ke tampilan kategori
+  }
+
+  // Muat data Buku Kanisius dari rekap (kasir = verifikator > 0), urutkan kode asc
+  async function muatSndKanisius() {
+    const my = ++sndSeq;
+    sndKosongkan('Memuat Buku Kanisius...');
+    try {
+      const res = await api('rekap', {});
+      if (my !== sndSeq) return;
+      
+      // Filter: produk numeric 10-digit, kasir == verifikator > 0
+      const kanisiusItems = (res.data || [])
+        .filter(it => {
+          const kode = String(it.produk_id || '').trim();
+          return /^\d{10}$/.test(kode) && Number(it.qty_kasir) === Number(it.qty_verifikator) && Number(it.qty_kasir) > 0;
+        })
+        .map(it => ({
+          produk_id: String(it.produk_id).trim(),
+          nama_produk: it.nama_produk,
+          harga: it.harga,
+          jumlah: Number(it.qty_kasir),
+          status: 'COCOK'
+        }))
+        .sort((a, b) => String(a.produk_id).localeCompare(String(b.produk_id)));
+      
+      if (my !== sndSeq) return;
+      
+      sndData = { items: kanisiusItems, belum: 0, total_pcs: kanisiusItems.reduce((s, it) => s + it.jumlah, 0), kode2: 'KANISIUS' };
+      sndHal = 1;
+      renderSnd();
+    } catch (err) {
+      if (my !== sndSeq) return;
+      if (handleAuthError(err)) return;
+      sndKosongkan('Gagal memuat: ' + err.message);
+    }
   }
 
   async function muatSnd(k2) {
@@ -1552,6 +1689,7 @@
     const belum = sndData.belum ? ` · ${fmt(sndData.belum)} produk lain belum valid (masih selisih atau menunggu pasangan)` : '';
     const list = sEl('sndList');
     list.textContent = '';
+    sndProductMap.clear();
 
     if (total === 0) {
       sEl('sndSummary').textContent = `Supplier ${k2}: belum ada produk dengan jumlah valid${belum}.`;
@@ -1565,15 +1703,20 @@
     sndHal = Math.min(Math.max(sndHal, 1), pages);
     const awal = (sndHal - 1) * SND_PER_HAL;
     items.slice(awal, awal + SND_PER_HAL).forEach(it => {
+      const kode = String(it.produk_id).trim();
+      // Simpan ke map untuk lookup jumlah saat QR_JUMLAH
+      sndProductMap.set(kode, { produk_id: kode, nama_produk: it.nama_produk, harga: it.harga, jumlah: it.jumlah });
+
       const row = document.createElement('div'); row.className = 'snd-item klik';
       row.tabIndex = 0;
       row.setAttribute('role', 'button');
-      row.setAttribute('aria-label', 'Tampilkan QR kode produk ' + it.produk_id);
-      row.onclick = () => bukaQr(String(it.produk_id).trim());
-      row.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bukaQr(String(it.produk_id).trim()); } };
+      row.setAttribute('aria-label', 'Tampilkan QR kode produk ' + kode);
+      const format = sndMetodeTerpilih === 'QR_JUMLAH' ? 'QR_JUMLAH' : 'QR';
+      row.onclick = () => bukaQr(kode, format);
+      row.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bukaQr(kode, format); } };
+      
       const main = document.createElement('div'); main.className = 'snd-main';
       const kd = document.createElement('div'); kd.className = 'snd-kode';
-      const kode = String(it.produk_id);
       const hit = document.createElement('mark'); hit.textContent = kode.substr(4, 2);
       kd.append(kode.substr(0, 4), hit, kode.substr(6));
       const nm = document.createElement('div'); nm.className = 'snd-nama'; nm.textContent = it.nama_produk;
@@ -1587,6 +1730,14 @@
       const hg = document.createElement('div'); hg.className = 'snd-harga';
       hg.textContent = Number(it.harga) > 0 ? 'Rp ' + fmt(it.harga) : '–';
       side.append(q, hg);
+
+      // Ribbon indikator sudah diklik
+      const ribbon = document.createElement('div');
+      ribbon.className = 'snd-ribbon';
+      ribbon.id = 'sndRibbon-' + kode.replace(/[^A-Za-z0-9]/g, '_');
+      ribbon.textContent = '✓';
+      ribbon.style.display = sndKlikSet.has(kode) ? 'flex' : 'none';
+      row.appendChild(ribbon);
 
       row.append(main, side);
       list.appendChild(row);
@@ -1639,11 +1790,25 @@
     return svg;
   }
 
-  function bukaQr(kode) {
+  function bukaQr(kode, format = 'QR') {
+    // Tandai produk sebagai sudah diklik
+    sndKlikSet.add(kode);
+    const ribbon = document.getElementById('sndRibbon-' + kode.replace(/[^A-Za-z0-9]/g, '_'));
+    if (ribbon) ribbon.style.display = 'flex';
+
+    // Tentukan isi QR berdasarkan format
+    let qrContent = kode;
+    if (format === 'QR_JUMLAH') {
+      const prod = sndProductMap.get(kode);
+      if (prod && prod.jumlah > 0) {
+        qrContent = `${kode}|${prod.jumlah}`;
+      }
+    }
+
     const box = document.getElementById('qrBox');
     box.textContent = '';
     try {
-      box.appendChild(buatQrSvg(kode));
+      box.appendChild(buatQrSvg(qrContent));
     } catch (err) {
       return showModal("QR Gagal Dibuat", err.message);
     }
@@ -1654,6 +1819,13 @@
   function tutupQr() {
     document.getElementById('qrModal').style.display = 'none';
     document.getElementById('qrBox').textContent = '';
+    
+    // Setelah tutup QR: jika daftar produk > 1, tetap di sndModal; jika 1, tutup sndModal juga
+    const items = sndData.items || [];
+    if (items.length <= 1) {
+      tutupSnd();
+    }
+    // Jika > 1 produk, tetap di sndModal (daftar produk tetap terbuka)
   }
 
   // Hanya klik pada AREA KOSONG (latar gelap) yang menutup; mengetuk QR-nya sendiri tidak menutup.
