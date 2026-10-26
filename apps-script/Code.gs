@@ -20,11 +20,13 @@ var CABANG_VALID = ['kranggan', 'katedral', 'santamaria', 'athanasius', 'antoniu
 var ROLE_VALID = ['KASIR', 'VERIFIKATOR'];
 
 // Format sheet tiap cabang: SATU BARIS PER PRODUK (kolom A-G) + kolom H "keterangan" (jejak audit)
-var HEADER = ['kode_produk', 'nama_produk', 'harga', 'input_kasir', 'timestamp_kasir', 'input_verifikator', 'timestamp_verifikator'];
+var HEADER = ['kode_produk', 'nama_produk', 'harga', 'input_kasir', 'timestamp_kasir', 'input_verifikator', 'timestamp_verifikator', 'keterangan', 'kategori'];
 var HEADER_KET = 'keterangan';
+var HEADER_KAT = 'kategori';
 var COL_KASIR = 4;        // D (timestamp di E)
 var COL_VERIFIKATOR = 6;  // F (timestamp di G)
 var COL_KET = 8;          // H
+var COL_KAT = 9;          // I
 var FORMAT_WAKTU = 'dd/MM/yyyy HH:mm:ss';
 var WARNA_AWAL = '#FCE4D6';   // baris input awal yang selisih (oranye muda)
 var WARNA_REKON = '#E2EFDA';  // baris rekonsiliasi (hijau muda)
@@ -47,9 +49,13 @@ function siapkanSheet_(ss, nama) {
   var sheet = ss.getSheetByName(nama);
   if (!sheet) sheet = ss.insertSheet(nama);
   if (!cekFormatSheet_(sheet)) {
-    sheet.appendRow(HEADER.concat([HEADER_KET]));
-  } else if (!String(sheet.getRange(1, COL_KET).getValue()).trim()) {
-    sheet.getRange(1, COL_KET).setValue(HEADER_KET);
+    sheet.appendRow(HEADER);
+  } else {
+    // Pastikan kolom H keterangan dan kolom I kategori ada
+    var h = String(sheet.getRange(1, COL_KET).getValue()).trim();
+    if (!h) sheet.getRange(1, COL_KET).setValue(HEADER_KET);
+    var kat = String(sheet.getRange(1, COL_KAT).getValue()).trim();
+    if (!kat) sheet.getRange(1, COL_KAT).setValue(HEADER_KAT);
   }
   return sheet;
 }
@@ -286,12 +292,13 @@ function simpan_(user, b) {
     var now = new Date();
     var kode = String(m[0]).trim();
     var total;
+    var kategori = String(b.kategori || '').trim().toUpperCase();
 
     var row = barisAktif_(sheet, kode);
     if (row) {
       // Jika baris aktif adalah hasil rekonsiliasi, JANGAN diubah (jejak audit). Buat baris "LANJUTAN" di bawahnya.
       if (String(sheet.getRange(row, COL_KET).getValue()).indexOf('REKONSILIASI') === 0) {
-        var cur = sheet.getRange(row, 1, 1, 7).getValues()[0];
+        var cur = sheet.getRange(row, 1, 1, 9).getValues()[0];
         sheet.insertRowAfter(row);
         row = row + 1;
         var rg = sheet.getRange(row, 1, 1, COL_KET);
@@ -301,11 +308,12 @@ function simpan_(user, b) {
       }
       total = (Number(sheet.getRange(row, kolom).getValue()) || 0) + qty;
       sheet.getRange(row, kolom, 1, 2).setValues([[total, now]]);
+      if (kategori) sheet.getRange(row, COL_KAT).setValue(kategori);
       sheet.getRange(row, kolom + 1).setNumberFormat(FORMAT_WAKTU);
     } else {
       var baru = sheet.getLastRow() + 1;
       sheet.getRange(baru, 1).setNumberFormat('@');
-      var data = [kode, m[2], m[3], '', '', '', ''];
+      var data = [kode, m[2], m[3], '', '', '', '', '', kategori];
       data[kolom - 1] = qty;
       data[kolom] = now;
       sheet.getRange(baru, 1, 1, HEADER.length).setValues([data]);
@@ -345,7 +353,7 @@ function rekap_(user, b) {
   var p = barisAktifSemua_(sheet.getDataRange().getValues());
   var out = p.urutan.map(function (kode) {
     var r = p.aktif[kode];
-    return { produk_id: kode, nama_produk: r[1], harga: r[2], qty_kasir: Number(r[3]) || 0, qty_verifikator: Number(r[5]) || 0 };
+    return { produk_id: kode, nama_produk: r[1], harga: r[2], qty_kasir: Number(r[3]) || 0, qty_verifikator: Number(r[5]) || 0, kategori: String(r[8] || "").trim() };
   });
   return { ok: true, data: out, cabang: target };
 }
@@ -372,7 +380,8 @@ function snd_(user, b) {
     if (waktu_(r[4]) && waktu_(r[6]) && k === v) {
       items.push({
         produk_id: kode, nama_produk: r[1], harga: r[2], jumlah: k,
-        status: String(r[7] || '').indexOf('REKONSILIASI') === 0 ? 'REKONSILIASI' : 'COCOK'
+        status: String(r[7] || '').indexOf('REKONSILIASI') === 0 ? 'REKONSILIASI' : 'COCOK',
+        kategori: String(r[8] || '').trim()
       });
       total += k;
     } else {
@@ -457,7 +466,7 @@ function rekonsiliasi_(user, b) {
     var row = barisAktif_(sheet, kode);
     if (!row) return { ok: false, code: 'STALE', error: 'Produk tidak ditemukan di sheet cabang.' };
 
-    var cur = sheet.getRange(row, 1, 1, 7).getValues()[0];
+    var cur = sheet.getRange(row, 1, 1, 9).getValues()[0];
     var k = Number(cur[3]) || 0, v = Number(cur[5]) || 0;
     if (!waktu_(cur[4]) || !waktu_(cur[6]) || k === v) {
       hapusRekon_(user.cabang, kode);
@@ -501,8 +510,8 @@ function rekonsiliasi_(user, b) {
 
     sheet.insertRowAfter(row);
     var baru = row + 1;
-    var rg = sheet.getRange(baru, 1, 1, COL_KET);
-    rg.setValues([[cur[0], cur[1], cur[2], nilai, now, nilai, now, ket]]);
+    var rg = sheet.getRange(baru, 1, 1, COL_KAT);
+    rg.setValues([[cur[0], cur[1], cur[2], nilai, now, nilai, now, ket, cur[8] || '']]);
     rg.setBackground(WARNA_REKON);
     sheet.getRange(baru, 1).setNumberFormat('@');
     sheet.getRange(baru, 5).setNumberFormat(FORMAT_WAKTU);
