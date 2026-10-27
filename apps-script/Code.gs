@@ -14,7 +14,7 @@
 
 // ===== PENGATURAN =====
 // var PIN_DEFAULT = '';          // PIN Kasir & Verifikator semua cabang
-// var PIN_ADMIN_DEFAULT = '; // PIN Super User (admin) saja          // Disarankan: isi Script Properties APP_PIN agar PIN tidak ada di kode
+// var PIN_ADMIN_DEFAULT = '';\n// var PIN_VERIFIKATOR_DEFAULT = ''; // PIN Verifikator saja // PIN Super User (admin) saja          // Disarankan: isi Script Properties APP_PIN agar PIN tidak ada di kode
 var SESSION_SECONDS = 1 * 60 * 60;   // 6 jam (batas maksimum CacheService)
 var CABANG_VALID = ['kranggan', 'katedral', 'santamaria', 'athanasius', 'antonius', 'paulus'];
 var ROLE_VALID = ['KASIR', 'VERIFIKATOR'];
@@ -190,7 +190,7 @@ function doPost(e) {
       case 'snd':    return json_(snd_(efektif_(requireSession_(body), body), body));
       case 'rekonsiliasi': return json_(rekonsiliasi_(efektif_(requireSession_(body), body), body));
       case 'jadwal_get': return json_(jadwalGet_(requireSession_(body)));
-      case 'jadwal_set': return json_(jadwalSet_(requireSession_(body), body));
+      case 'jadwal_set': return json_(jadwalSet_(requireSession_(body), body));\n      case 'toggle_verif_get': return json_(toggleVerifGet_(requireSession_(body)));\n      case 'toggle_verif_set': return json_(toggleVerifSet_(efektif_(requireSession_(body), body), body));
       default:       return json_({ ok: false, error: 'Aksi tidak dikenal.' });
     }
   } catch (err) {
@@ -210,36 +210,36 @@ function login_(b) {
 
   // Admin dan cabang memakai PIN yang BERBEDA. Script Properties (APP_PIN_ADMIN / APP_PIN) boleh menggantikan bawaan.
   var props = PropertiesService.getScriptProperties();
-  var benar = cabang === 'admin'
-    ? String(props.getProperty('APP_PIN_ADMIN') || PIN_ADMIN_DEFAULT)
-    : String(props.getProperty('APP_PIN') || PIN_DEFAULT);
-  if (pin !== benar) {
-    Utilities.sleep(800); // memperlambat tebak PIN
-    return { ok: false, error: 'PIN salah.' };
-  }
+  // Admin, Kasir, dan Verifikator memakai PIN yang BERBEDA.
+  var props = PropertiesService.getScriptProperties();
 
-  var role = String(b.role || '').toUpperCase().trim();
-  var user;
-
+  // Admin: PIN admin tersendiri
   if (cabang === 'admin') {
-    user = { username: 'admin', role: 'ADMIN', cabang: 'admin' };
-  } else {
-    if (CABANG_VALID.indexOf(cabang) < 0) return { ok: false, error: 'Cabang tidak valid.' };
-    if (ROLE_VALID.indexOf(role) < 0) return { ok: false, error: 'Role tidak valid.' };
-    user = { username: cabang + '_' + role.toLowerCase(), role: role, cabang: cabang };
+    var benarAdmin = String(props.getProperty('APP_PIN_ADMIN') || PIN_ADMIN_DEFAULT);
+    if (pin !== benarAdmin) { Utilities.sleep(800); return { ok: false, error: 'PIN salah.' }; };
+    var user = { username: 'admin', role: 'ADMIN', cabang: 'admin' };
+    var token = Utilities.getUuid() + Utilities.getUuid();
+    CacheService.getScriptCache().put('ses_' + token, JSON.stringify(user), SESSION_SECONDS);
+    return { ok: true, token: token, user: user };
   }
 
-  var token = Utilities.getUuid() + Utilities.getUuid();
-  CacheService.getScriptCache().put('ses_' + token, JSON.stringify(user), SESSION_SECONDS);
-  return { ok: true, token: token, user: user };
-}
+  // Cabang: Kasir dan Verifikator
+  if (CABANG_VALID.indexOf(cabang) < 0) return { ok: false, error: 'Cabang tidak valid.' };
+  if (ROLE_VALID.indexOf(role) < 0) return { ok: false, error: 'Role tidak valid.' };
 
-function requireSession_(b) {
-  var raw = b.token ? CacheService.getScriptCache().get('ses_' + b.token) : null;
-  if (!raw) {
-    var e = new Error('Sesi berakhir. Silakan login kembali.');
-    e.code = 'AUTH';
-    throw e;
+  // Blokir login Verifikator saat mode OFF
+  if (role === 'VERIFIKATOR') {
+    var valVerif = props.getProperty('TOGGLE_VERIFIKATOR');
+    if (valVerif === '0') {
+      return { ok: false, error: 'Login Verifikator sementara dinonaktifkan oleh admin (mode verifikator OFF).' };
+    }
+    var benarVerif = String(props.getProperty('APP_PIN_VERIFIKATOR') || PIN_VERIFIKATOR_DEFAULT);
+    if (pin !== benarVerif) { Utilities.sleep(800); return { ok: false, error: 'PIN Verifikator salah.' }; }
+  } else {
+    // Kasir pakai PIN cabang biasa
+    var benarKasir = String(props.getProperty('APP_PIN') || PIN_DEFAULT);
+    if (pin !== benarKasir) { Utilities.sleep(800); return { ok: false, error: 'PIN salah.' }; }
+  }
   }
   return JSON.parse(raw);
 }
@@ -529,4 +529,21 @@ function rekonsiliasi_(user, b) {
   } finally {
     lock.releaseLock();
   }
+}
+
+
+
+// ===== TOGGLE VERIFIKATOR (server-side, semua cabang) =====
+function toggleVerifGet_(user) {
+  var props = PropertiesService.getScriptProperties();
+  var val = props.getProperty('TOGGLE_VERIFIKATOR');
+  return { ok: true, aktif: val !== '0' }; // default true
+}
+
+function toggleVerifSet_(user, b) {
+  if (user.role !== 'ADMIN') return { ok: false, error: 'Hanya admin yang boleh mengubah mode ini.' };
+  var aktif = b.aktif === true;
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty('TOGGLE_VERIFIKATOR', aktif ? '1' : '0');
+  return { ok: true, aktif: aktif };
 }
