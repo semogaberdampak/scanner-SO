@@ -583,6 +583,7 @@
         <button type="button" id="btnPeranVERIFIKATOR" onclick="setPeranUji('VERIFIKATOR')">Sebagai Verifikator</button>
       </div>
       <button class="btn btn-secondary" style="width: 100%; margin-top: 8px;" onclick="bukaJadwal()">📅 Atur Jadwal Input Cabang</button>
+      <button class="btn btn-secondary" id="btnTogglePencocokanVerif" style="width: 100%; margin-top: 8px;" onclick="togglePencocokanVerifikasi()">Matikan Pencocokan Verifikator</button>
     </div>
     <!-- Kasir/Verifikator: status jadwal input cabang -->
     <div class="akses-bar" id="aksesBar" style="display: none;">-</div>
@@ -788,6 +789,8 @@
   const PERAN_KEY = 'scanstock.peranuji';
   let peranUji = 'KASIR';
   try { const p = localStorage.getItem(PERAN_KEY); if (p === 'KASIR' || p === 'VERIFIKATOR') peranUji = p; } catch (e) {}
+  // Status pencocokan verifikator (ON/OFF). Default ON, tersimpan di localStorage.
+  let pencocokanVerifAktif = (localStorage.getItem('scanstock.pencocokanVerif') !== '0');
   function isAdmin() { return !!currentUser && currentUser.role === 'ADMIN'; }
   function peranAktif() { return isAdmin() ? peranUji : (currentUser ? currentUser.role : ''); }
   const labelSheet = () => (isAdmin() ? 'TES_INPUT' : (currentUser ? currentUser.cabang.toUpperCase() : ''));
@@ -1658,7 +1661,7 @@
     const katLabel = sndKategoriTerpilih === 'NON_KANISIUS' ? 'Buku Non Kanisius' : 'Eksternal';
     sndKosongkan(`Memuat ${katLabel} supplier ${k2}...`);
     try {
-      const res = await api('snd', { kode2: k2 });
+      const res = await api('snd', { kode2: k2, verifOff: !pencocokanVerifAktif });
       if (my !== sndSeq) return;
 
       // Filter berdasarkan kategori dari data API (kolom I di sheet)
@@ -1791,7 +1794,7 @@
     return svg;
   }
 
-  function bukaQr(kode, format = 'QR') {
+  function bukaQr(kode, format = 'QR', withEnter = true) {
     // Tandai produk sebagai sudah diklik
     sndKlikSet.add(kode);
     const ribbon = document.getElementById('sndRibbon-' + kode.replace(/[^A-Za-z0-9]/g, '_'));
@@ -1805,6 +1808,10 @@
         qrContent = `${kode}|${prod.jumlah}`;
       }
     }
+
+    // Akhiri data QR dengan perintah Enter (Carriage Return) agar saat discan
+    // scanner langsung menekan Enter (pindah ke kolom/baris berikutnya otomatis).
+    if (withEnter) qrContent += '\r';
 
     const box = document.getElementById('qrBox');
     box.textContent = '';
@@ -1964,6 +1971,36 @@
     jEl('jadwalModal').style.display = 'none';
   }
 
+  // ---------- Toggle pencocokan verifikator (hanya admin) ----------
+
+  function togglePencocokanVerifikasi() {
+    if (!isAdmin()) return;
+    const akanNyalakan = !pencocokanVerifAktif;
+    const pesan = akanNyalakan
+      ? 'Yakin ingin mengaktifkan kembali pencocokan verifikator?'
+      : 'Yakin ingin mematikan pencocokan verifikator? Fitur pencocokan kasir & verifikator akan dinonaktifkan.';
+    if (!confirm(pesan)) return;
+    pencocokanVerifAktif = akanNyalakan;
+    try { localStorage.setItem('scanstock.pencocokanVerif', pencocokanVerifAktif ? '1' : '0'); } catch (e) {}
+    const btn = document.getElementById('btnTogglePencocokanVerif');
+    if (btn) btn.textContent = pencocokanVerifAktif ? 'Matikan Pencocokan Verifikator' : 'Aktifkan Pencocokan Verifikator';
+    terapkanTogglePencocokanVerif();
+  }
+
+  function terapkanTogglePencocokanVerif() {
+    const on = pencocokanVerifAktif;
+    if (!on) {
+      const bell = document.getElementById('btnBell');
+      if (bell) bell.style.display = 'none';
+      const notifPanel = document.getElementById('notifPanel');
+      if (notifPanel && notifPanel.style.display === 'flex') notifPanel.style.display = 'none';
+      const reconModal = document.getElementById('reconModal');
+      if (reconModal && reconModal.style.display === 'flex') reconModal.style.display = 'none';
+      reconItem = null;
+    }
+    // Saat ON: tidak paksa menampilkan bell, biarkan logika role/polling yang mengatur.
+  }
+
   // ---------- Pencocokan (dua pihak harus sepakat) ----------
   const namaPeran = r => (r === 'KASIR' ? 'Kasir' : 'Verifikator');
   const peranLain = () => (peranAktif() === 'KASIR' ? 'VERIFIKATOR' : 'KASIR');
@@ -2007,6 +2044,7 @@
   }
 
   function openRecon(i) {
+    if (!pencocokanVerifAktif) return showModal("Pencocokan Dinonaktifkan", "Pencocokan verifikator sedang dimatikan oleh admin. Aktifkan kembali melalui panel admin.");
     const it = notif.items[i];
     if (!it) return;
     reconItem = it;
@@ -2029,6 +2067,7 @@
 
   function mintaKonfirmasiRecon() {
     if (!reconItem) return;
+    if (!pencocokanVerifAktif) return showModal("Pencocokan Dinonaktifkan", "Pencocokan verifikator sedang dimatikan oleh admin.");
     if (!aksesTerbuka) return showModal("Input Ditutup", "Pencocokan juga dikunci di luar jadwal input cabang ini.");
     const raw = document.getElementById('reconNilai').value.trim();
     const n = Number(raw);
@@ -2051,6 +2090,7 @@
 
   async function simpanRecon() {
     if (!reconItem || reconBusy) return;
+    if (!pencocokanVerifAktif) return showModal("Pencocokan Dinonaktifkan", "Pencocokan verifikator sedang dimatikan oleh admin.");
     const nilai = Number(document.getElementById('reconNilai').value);
     const it = reconItem;
     const yes = document.getElementById('btnReconYa');

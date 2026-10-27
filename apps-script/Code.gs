@@ -366,6 +366,8 @@ function snd_(user, b) {
   if (user.role !== 'KASIR') return { ok: false, error: 'Fitur Input SnD hanya untuk Kasir.' };
   var kode2 = String(b.kode2 || '').trim().toUpperCase();
   if (!/^[A-Z0-9]{2}$/.test(kode2)) return { ok: false, error: 'Isi tepat 2 karakter (huruf atau angka).' };
+  // Jika pencocokan verifikator dimatikan, cukup kasir sudah input dan qty valid.
+  var verifOff = b.verifOff === true;
 
   var kosong = { ok: true, kode2: kode2, items: [], belum: 0, total_pcs: 0 };
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(user.cabang);
@@ -377,7 +379,7 @@ function snd_(user, b) {
     if (kode.length < 6 || kode.substr(4, 2).toUpperCase() !== kode2) return;
     var r = p.aktif[kode];
     var k = Number(r[3]) || 0, v = Number(r[5]) || 0;
-    if (waktu_(r[4]) && waktu_(r[6]) && k === v) {
+    if (verifOff ? (waktu_(r[4]) && k > 0) : (waktu_(r[4]) && waktu_(r[6]) && k === v)) {
       items.push({
         produk_id: kode, nama_produk: r[1], harga: r[2], jumlah: k,
         status: String(r[7] || '').indexOf('REKONSILIASI') === 0 ? 'REKONSILIASI' : 'COCOK',

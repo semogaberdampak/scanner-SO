@@ -83,6 +83,27 @@ Setiap `git push` ke `main` otomatis men-deploy ulang.
 - Input susulan setelah rekonsiliasi dicatat di baris baru berlabel LANJUTAN (baris rekonsiliasi tidak pernah diubah).
 - Setelah mengubah `Code.gs`, selalu buat versi deployment baru (Deploy > Manage deployments > Edit > New version).
 
+## QR Code dengan Perintah "Enter"
+
+- Setiap QR kode yang dihasilkan (tombol tampilkan QR di layar SnD) diakhiri dengan karakter **Carriage Return (`\r`)**.
+- Saat QR tersebut discan oleh scanner barcode (mode keyboard wedge), scanner akan mengetik isi QR lalu menekan **Enter** secara otomatis, sehingga kursor pindah ke kolom/baris berikutnya tanpa perlu menekan tombol secara manual.
+- Contoh isi QR: `ITEM001|5` + `Enter` (dikirim sebagai `ITEM001|5\r`).
+- Perilaku ini bergantung pada konfigurasi scanner handheld. Beberapa scanner mungkin memfilter karakter kontrol; pastikan scanner diatur untuk mengirimkan suffix Enter setelah scan.
+
+## Toggle Pencocokan Verifikator (Admin)
+
+- Hanya role **ADMIN** yang melihat tombol toggle di panel admin (Mode Uji).
+- Tombol berubah teks sesuai status:
+  - `Matikan Pencocokan Verifikator` → fitur pencocokan Kasir ↔ Verifikator **AKTIF** (default).
+  - `Aktifkan Pencocokan Verifikator` → fitur pencocokan **MATI**.
+- Saat MATI:
+  - Modal Pencocokan Selisih (`reconModal`) tidak dapat dibuka.
+  - Lonceng notifikasi selisih disembunyikan.
+  - Aksi simpan pencocokan (`rekonsiliasi`) diblokir di frontend.
+  - Muncul konfirmasi `confirm` saat mematikan maupun saat mengaktifkan kembali.
+- Status tersimpan di `localStorage` sehingga tetap setelah halaman dimuat ulang.
+- **Fitur input SND (scan & stok entry) tetap bekerja normal** baik toggle dalam status ON maupun OFF.
+
 ## Pencarian produk (ketik)
 
 - Tidak peka huruf besar/kecil (`1123lb0001` = `1123LB0001`).
