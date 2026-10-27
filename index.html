@@ -1011,6 +1011,150 @@
     /* Legacy header/user-bar hidden in new layout */
     .header, .user-bar { display: none !important; }
     .status-text { display: none; }
+
+    /* ===== PHASE 3: Micro-interactions ===== */
+
+    /* Staggered list animation */
+    .stagger-list > * {
+      opacity: 0;
+      transform: translateY(12px);
+      animation: staggerIn var(--dur-slow) var(--ease-out) forwards;
+    }
+    .stagger-list > *:nth-child(1) { animation-delay: 0ms; }
+    .stagger-list > *:nth-child(2) { animation-delay: 40ms; }
+    .stagger-list > *:nth-child(3) { animation-delay: 80ms; }
+    .stagger-list > *:nth-child(4) { animation-delay: 120ms; }
+    .stagger-list > *:nth-child(5) { animation-delay: 160ms; }
+    .stagger-list > *:nth-child(6) { animation-delay: 200ms; }
+    .stagger-list > *:nth-child(7) { animation-delay: 240ms; }
+    .stagger-list > *:nth-child(8) { animation-delay: 280ms; }
+    .stagger-list > *:nth-child(9) { animation-delay: 320ms; }
+    .stagger-list > *:nth-child(10) { animation-delay: 360ms; }
+    @keyframes staggerIn {
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .stagger-list > * { animation: none; opacity: 1; transform: none; }
+    }
+
+    /* Scan success flash */
+    .result-card.flash {
+      animation: scanFlash var(--dur-normal) var(--ease-out);
+    }
+    @keyframes scanFlash {
+      0% { box-shadow: 0 0 0 0 var(--accent); border-color: var(--accent); }
+      50% { box-shadow: 0 0 0 8px transparent; border-color: var(--accent); }
+      100% { box-shadow: 0 0 0 0 transparent; border-color: var(--border-color); }
+    }
+
+    /* Pull-to-refresh visual indicator */
+    .ptr-indicator {
+      position: fixed;
+      top: calc(var(--space-3) + env(safe-area-inset-top, 0px));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: var(--z-toast);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-4);
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-full);
+      box-shadow: var(--shadow-3);
+      font-size: var(--text-sm);
+      color: var(--text-main);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+    }
+    .ptr-indicator.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    .ptr-indicator.pulling {
+      transform: translateX(-50%) translateY(var(--ptr-offset, 0));
+    }
+    .ptr-spinner {
+      width: 18px;
+      height: 18px;
+      border: 2.5px solid var(--border-color);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Smooth height transitions for modals/panels */
+    .animate-height {
+      transition: max-height var(--dur-slower) var(--ease-out), opacity var(--dur-normal) var(--ease-out), padding var(--dur-slower) var(--ease-out), margin var(--dur-slower) var(--ease-out);
+      overflow: hidden;
+    }
+    .animate-height.collapsed {
+      max-height: 0 !important;
+      opacity: 0;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+    }
+
+    /* Modal enter/exit animations */
+    .modal-overlay {
+      opacity: 0;
+      transition: opacity var(--dur-normal) var(--ease-out);
+    }
+    .modal-overlay[style*="flex"] {
+      opacity: 1;
+    }
+    .modal-box {
+      transform: scale(0.92) translateY(8px);
+      transition: transform var(--dur-slow) var(--ease-spring), opacity var(--dur-normal) var(--ease-out);
+      opacity: 0;
+    }
+    .modal-overlay[style*="flex"] .modal-box {
+      transform: scale(1) translateY(0);
+      opacity: 1;
+    }
+
+    /* Button press ripple */
+    .btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: currentColor;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .btn:active::after {
+      animation: ripple var(--dur-normal) var(--ease-out);
+    }
+    @keyframes ripple {
+      0% { transform: scale(0); opacity: 0.15; }
+      100% { transform: scale(2.5); opacity: 0; }
+    }
+
+    /* Card hover/tap feedback */
+    .card:active, .notif-item:active, .pick-item:active, .snd-item.klik:active {
+      transform: scale(0.99);
+    }
+
+    /* Focus ring enhancement */
+    .icon-btn:focus-visible, .fab:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
+    }
+
+    /* Toast/notification animation */
+    @keyframes slideUpIn {
+      from { opacity: 0; transform: translateY(16px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes slideDownOut {
+      from { opacity: 1; transform: translateY(0) scale(1); }
+      to { opacity: 0; transform: translateY(-8px) scale(0.98); }
+    }
   </style>
 </head>
 <body>
@@ -1116,7 +1260,7 @@
       </div>
 
       <!-- Akses Bar (Kasir/Verifikator) -->
-      <div class="akses-bar card" id="aksesBar" style="display: none;" role="status" aria-live="polite"></div>
+      <div class="akses-bar card animate-height" id="aksesBar" role="status" aria-live="polite"></div>
 
       <!-- Scanner Area - Full Bleed -->
       <div class="scanner-area" id="scannerArea">
@@ -1353,7 +1497,7 @@
   <div class="modal-box">
     <div class="modal-title" id="modalTitle">Berhasil</div>
     <div class="modal-body" id="modalMessage">Data jumlah produk telah disimpan.</div>
-    <button class="btn btn-primary" style="width: 100%;" onclick="closeModal()">OK</button>
+    <button class="btn btn-primary" style="width: 100%;" onclick="closeNotifyModal()">OK</button>
   </div>
 </div>
 
@@ -1605,20 +1749,59 @@
               if (submitBtn) submitBtn.click();
             }
             break;
-          case 'Escape': // Esc: Close modals
-            document.querySelectorAll('.modal[style*="flex"]').forEach(m => m.style.display = 'none');
+          case 'Escape': // Esc: Close modals with animation
+            document.querySelectorAll('.modal[style*="flex"]').forEach(m => closeModal(m));
             break;
         }
       }
     });
   }
 
+  // ================= MODAL ANIMATION HELPERS =================
+  const MODAL_ANIMATION_DURATION = 300; // matches --duration-normal
+
+  function openModal(modalEl) {
+    if (!modalEl) return;
+    modalEl.style.display = 'flex';
+    // Force reflow to ensure animation plays
+    void modalEl.offsetWidth;
+    modalEl.classList.add('modal-enter');
+    // Clean up animation class after it completes
+    setTimeout(() => modalEl.classList.remove('modal-enter'), MODAL_ANIMATION_DURATION);
+  }
+
+  function closeModal(modalEl) {
+    if (!modalEl) return;
+    modalEl.classList.add('modal-exit');
+    setTimeout(() => {
+      modalEl.style.display = 'none';
+      modalEl.classList.remove('modal-exit');
+    }, MODAL_ANIMATION_DURATION);
+  }
+
   // ================= PULL TO REFRESH =================
   let pullStartY = 0;
   let pullCurrentY = 0;
   let isPulling = false;
+  let ptrIndicator = null;
+
+  // Create ptr-indicator element
+  function createPtrIndicator() {
+    if (ptrIndicator) return ptrIndicator;
+    ptrIndicator = document.createElement('div');
+    ptrIndicator.className = 'ptr-indicator';
+    ptrIndicator.innerHTML = `
+      <div class="ptr-spinner"></div>
+      <div class="ptr-text">Tarik untuk refresh</div>
+    `;
+    document.body.insertBefore(ptrIndicator, document.body.firstChild);
+    return ptrIndicator;
+  }
 
   function initPullToRefresh() {
+    // Create the indicator element
+    createPtrIndicator();
+
     document.addEventListener('touchstart', (e) => {
       if (window.scrollY === 0) {
         pullStartY = e.touches[0].clientY;
@@ -1634,6 +1817,25 @@
         e.preventDefault();
         document.body.style.transform = `translateY(${delta * 0.5}px)`;
         document.body.style.transition = 'none';
+
+        // Show/hide ptr-indicator based on pull distance
+        if (ptrIndicator) {
+          const progress = Math.min(delta / 80, 1);
+          ptrIndicator.style.opacity = progress;
+          ptrIndicator.style.transform = `translateY(-50%) scale(${0.8 + progress * 0.2})`;
+
+          // Update text based on progress
+          const textEl = ptrIndicator.querySelector('.ptr-text');
+          if (textEl) {
+            if (delta > 60) {
+              textEl.textContent = 'Lepas untuk refresh';
+              ptrIndicator.classList.add('ready');
+            } else {
+              textEl.textContent = 'Tarik untuk refresh';
+              ptrIndicator.classList.remove('ready');
+            }
+          }
+        }
       }
     }, { passive: false });
 
@@ -1642,6 +1844,13 @@
       const delta = pullCurrentY - pullStartY;
       document.body.style.transition = 'transform 0.3s ease';
       document.body.style.transform = 'translateY(0)';
+
+      // Hide ptr-indicator with animation
+      if (ptrIndicator) {
+        ptrIndicator.style.opacity = '0';
+        ptrIndicator.style.transform = 'translateY(-50%) scale(0.8)';
+        ptrIndicator.classList.remove('ready');
+      }
 
       if (delta > 60) {
         hapticFeedback('medium');
@@ -1839,6 +2048,10 @@
     document.getElementById('resPrice').innerText = "Rp " + Number(item.harga).toLocaleString('id-ID');
     card.className = "card result-card";
     card.style.display = "block";
+    // Trigger scan flash animation
+    card.classList.add('flash');
+    // Remove flash class after animation completes
+    setTimeout(() => card.classList.remove('flash'), 600);
 
     // Auto-select kategori Eksternal untuk produk alfanumerik 10 digit (contoh: 1123LB0001)
     const kode = String(item.produk_id || '').trim();
@@ -2103,11 +2316,11 @@
   function showModal(title, message) {
     document.getElementById('modalTitle').innerText = title;
     document.getElementById('modalMessage').innerText = message;
-    document.getElementById('notifyModal').style.display = 'flex';
+    openModal(document.getElementById('notifyModal'));
   }
 
-  function closeModal() {
-    document.getElementById('notifyModal').style.display = 'none';
+  function closeNotifyModal() {
+    closeModal(document.getElementById('notifyModal'));
   }
 
   const MIN_KODE_SEBAGIAN = 3;
@@ -2147,6 +2360,7 @@
   function bukaPilihProduk(raw, key, hasil, mode) {
     const list = document.getElementById('pilihList');
     list.textContent = '';
+    list.classList.add('stagger-list'); // Add staggered animation
     let sub = `${hasil.length} produk cocok dengan “${raw}”`;
     if (mode === 'sebagian') sub += ' (dicari di bagian mana pun dari kode)';
     if (hasil.length > MAKS_PILIHAN) sub += ` · menampilkan ${MAKS_PILIHAN} pertama, ketik kode lebih lengkap untuk mempersempit`;
@@ -2174,10 +2388,10 @@
       btn.append(main, hg);
       list.appendChild(btn);
     });
-    document.getElementById('pilihModal').style.display = 'flex';
+    openModal(document.getElementById('pilihModal'));
   }
 
-  function tutupPilihProduk() { document.getElementById('pilihModal').style.display = 'none'; }
+  function tutupPilihProduk() { closeModal(document.getElementById('pilihModal')); }
 
   // ================= KAMERA / SCANNER =================
   let qrScanner = null;
@@ -2437,14 +2651,14 @@
   }
 
   function openNotifPanel() {
-    document.getElementById('notifPanel').style.display = 'flex';
+    openModal(document.getElementById('notifPanel'));
     renderNotifList();
     pollNotif(true);
     hapticFeedback('light');
   }
 
   function closeNotifPanel() {
-    document.getElementById('notifPanel').style.display = 'none';
+    closeModal(document.getElementById('notifPanel'));
     hapticFeedback('light');
   }
 
@@ -2458,6 +2672,7 @@
   function renderNotifList() {
     const list = document.getElementById('notifList');
     list.textContent = '';
+    list.classList.add('stagger-list'); // Add staggered animation
     const cab = labelSheet();
     const upd = notif.updated ? notif.updated.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/\./g, ':') : '-';
     document.getElementById('notifSub').textContent =
@@ -2518,11 +2733,11 @@
     const btn = document.getElementById('btnSimpan');
     if (!a || isAdmin()) {
       aksesTerbuka = true;
-      bar.style.display = 'none';
+      bar.classList.add('collapsed');
     } else {
       aksesTerbuka = !!a.terbuka;
-      bar.style.display = 'block';
-      bar.className = 'akses-bar' + (a.terbuka ? '' : ' tutup');
+      bar.classList.remove('collapsed');
+      bar.className = 'akses-bar card animate-height' + (a.terbuka ? '' : ' tutup');
       if (a.terbuka) {
         bar.textContent = `Input DIBUKA hari ini (${tglLabel(a.hari_ini)}).`;
       } else {
@@ -2592,12 +2807,12 @@
     sEl('sndPageInfo').style.display = 'none';
     sEl('sndPager').style.display = 'none';
     sEl('sndKategoriWrapper').style.display = 'block';
-    sEl('sndModal').style.display = 'flex';
+    openModal(sEl('sndModal'));
   }
 
-  function tutupSnd() { 
-    sndSeq++; 
-    sEl('sndModal').style.display = 'none'; 
+  function tutupSnd() {
+    sndSeq++;
+    closeModal(sEl('sndModal'));
     // Reset state
     sndKategoriTerpilih = null;
     sndMetodeTerpilih = null;
@@ -2621,16 +2836,16 @@
   // --- Fungsi baru untuk kategori & metode ---
   function pilihKategori(kat) {
     sndKategoriTerpilih = kat;
-    sEl('sndMetodeKategori').textContent = 
+    sEl('sndMetodeKategori').textContent =
       kat === 'KANISIUS' ? 'Buku Kanisius' :
       kat === 'NON_KANISIUS' ? 'Buku Non Kanisius' : 'Eksternal';
-    sEl('sndMetodeModal').style.display = 'flex';
+    openModal(sEl('sndMetodeModal'));
   }
 
   function pilihMetode(metode) {
     sndMetodeTerpilih = metode;
-    sEl('sndMetodeModal').style.display = 'none';
-    
+    closeModal(sEl('sndMetodeModal'));
+
     if (sndKategoriTerpilih === 'KANISIUS') {
       // Buku Kanisius: otomatis muat daftar produk dari rekap (kasir=verifikator), sort asc
       muatSndKanisius();
@@ -2647,7 +2862,7 @@
   }
 
   function tutupSndMetode() {
-    sEl('sndMetodeModal').style.display = 'none';
+    closeModal(sEl('sndMetodeModal'));
     // Kembali ke tampilan kategori
   }
 
@@ -2724,6 +2939,7 @@
     const belum = sndData.belum ? ` · ${fmt(sndData.belum)} produk lain belum valid (masih selisih atau menunggu pasangan)` : '';
     const list = sEl('sndList');
     list.textContent = '';
+    list.classList.add('stagger-list'); // Add staggered animation
     sndProductMap.clear();
 
     if (total === 0) {
@@ -2852,11 +3068,11 @@
       return showModal("QR Gagal Dibuat", err.message);
     }
     qrDibukaPada = Date.now();
-    document.getElementById('qrModal').style.display = 'flex';
+    openModal(document.getElementById('qrModal'));
   }
 
   function tutupQr() {
-    document.getElementById('qrModal').style.display = 'none';
+    closeModal(document.getElementById('qrModal'));
     document.getElementById('qrBox').textContent = '';
 
     // Tutup QR saja. JANGAN panggil tutupSnd() karena itu akan menghapus sndKlikSet (ribbon).
@@ -2919,7 +3135,7 @@
         jEl('jdCabList').appendChild(lb);
       });
       renderJadwal();
-      jEl('jadwalModal').style.display = 'flex';
+      openModal(jEl('jadwalModal'));
     } catch (err) {
       if (handleAuthError(err)) return;
       showModal("Gagal Memuat Jadwal", err.message);
@@ -2999,7 +3215,7 @@
       jEl('jadwalSub').classList.add('jadwal-warn');
       return;
     }
-    jEl('jadwalModal').style.display = 'none';
+    closeModal(jEl('jadwalModal'));
   }
 
   // ---------- Toggle pencocokan verifikator (hanya admin) ----------
@@ -3033,9 +3249,9 @@
       const bell = document.getElementById('btnBell');
       if (bell) bell.style.display = 'none';
       const notifPanel = document.getElementById('notifPanel');
-      if (notifPanel && notifPanel.style.display === 'flex') notifPanel.style.display = 'none';
+      if (notifPanel && notifPanel.style.display === 'flex') closeModal(notifPanel);
       const reconModal = document.getElementById('reconModal');
-      if (reconModal && reconModal.style.display === 'flex') reconModal.style.display = 'none';
+      if (reconModal && reconModal.style.display === 'flex') closeModal(reconModal);
       reconItem = null;
     }
     // Saat ON: tidak paksa menampilkan bell, biarkan logika role/polling yang mengatur.
@@ -3144,14 +3360,14 @@
     document.getElementById('reconVerif').textContent = it.qty_verifikator + ' Pcs';
     document.getElementById('reconNilai').value = '';
     tampilkanStatusRecon();
-    document.getElementById('reconModal').style.display = 'flex';
+    openModal(document.getElementById('reconModal'));
     setTimeout(() => document.getElementById('reconNilai').focus(), 50);
     hapticFeedback('light');
   }
 
   function closeRecon() {
     if (reconBusy) return;
-    document.getElementById('reconModal').style.display = 'none';
+    closeModal(document.getElementById('reconModal'));
     reconItem = null;
     hapticFeedback('light');
   }
@@ -3171,13 +3387,13 @@
       (sudah
         ? `${lain} sudah mengajukan. Jika nilainya sama, data di sheet langsung diperbarui dan menggantikan input kasir (${reconItem.qty_kasir}) serta verifikator (${reconItem.qty_verifikator}). Jika berbeda, kedua pengajuan dibatalkan dan harus diisi ulang.`
         : `Data di sheet baru diperbarui setelah ${lain} mengajukan nilai yang sama.`);
-    document.getElementById('confirmModal').style.display = 'flex';
+    openModal(document.getElementById('confirmModal'));
     hapticFeedback('medium');
   }
 
   function tutupKonfirmasi() {
     if (reconBusy) return;
-    document.getElementById('confirmModal').style.display = 'none';
+    closeModal(document.getElementById('confirmModal'));
     hapticFeedback('light');
   }
 
@@ -3191,8 +3407,8 @@
     try {
       const res = await api('rekonsiliasi', { produk_id: it.produk_id, nilai: nilai, lihat_kasir: it.qty_kasir, lihat_verifikator: it.qty_verifikator });
       reconBusy = false;
-      document.getElementById('confirmModal').style.display = 'none';
-      document.getElementById('reconModal').style.display = 'none';
+      closeModal(document.getElementById('confirmModal'));
+      closeModal(document.getElementById('reconModal'));
       reconItem = null;
       const lain = namaPeran(peranLain());
       if (res.status === 'selesai') {
@@ -3210,10 +3426,10 @@
       }
     } catch (err) {
       reconBusy = false;
-      document.getElementById('confirmModal').style.display = 'none';
+      closeModal(document.getElementById('confirmModal'));
       if (handleAuthError(err)) return;
       if (err.code === 'STALE') {
-        document.getElementById('reconModal').style.display = 'none';
+        closeModal(document.getElementById('reconModal'));
         reconItem = null;
       }
       if (err.code === 'TUTUP') pollNotif(true);
