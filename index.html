@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
@@ -25,15 +25,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <script src="vendor/html5-qrcode.min.js"></script>
   <script src="vendor/qrcode.js"></script>
-  <script>
-    // Cadangan: dipakai bila config.js gagal dimuat (cache lama, pemblokir, dll.).
-    // Nilai di config.js tetap diutamakan kalau valid.
-    window.APP_DEFAULTS = {
-      API_URL: "https://script.google.com/macros/s/AKfycbzpxd_u_pFIDunZyh50aQRIMBlvdWZ5Ot3VCevsVKTX2kEGRytqOxkFOf6hyX-9Rfh7/exec",
-      POLL_SECONDS: 60
-    };
-  </script>
-  <script src="config.js" onerror="window.__configGagal = true; console.warn('config.js gagal dimuat, memakai nilai cadangan di index.html')"></script>
+  <script src="config.js" onerror="window.__configGagal = true; console.error('config.js gagal dimuat - pastikan config.js ada dan API_URL valid')"></script>
   <style>
     /* ==== Palet: hitam #000000 · abu terang #DFDEDC · abu gelap #464545 · teal #00ACAC · abu sedang #A6A7A2 ====
        Teal dipakai sebagai LATAR (tombol) dengan teks HITAM. Untuk TEKS/garis di mode terang dipakai teal yang
@@ -534,7 +526,10 @@
   <div class="status-text" id="dbStatus">⏳ Memuat Master Produk...</div>
 
   <div class="user-bar" id="userBar" style="display: none;">
-    <div>User: <strong id="currentUsername">-</strong> (<span class="role-badge" id="currentRole">-</span>)</div>
+    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+      <div>User: <strong id="currentUsername">-</strong> (<span class="role-badge" id="currentRole">-</span>)</div>
+      <span id="offlineBadge" style="display:none;background:var(--danger);color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">0</span>
+    </div>
     <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
       <select id="exportBranchSelect" style="display: none; width: auto; min-height: 34px; padding: 2px 6px; font-size: 12px;">
         <option value="kranggan">Kranggan</option>
@@ -828,6 +823,10 @@
         body: JSON.stringify(Object.assign({ action: action, token: session ? session.token : null, peran_uji: isAdmin() ? peranUji : undefined }, payload || {})),
         signal: ctrl.signal
       });
+      // Handle 401 Unauthorized - token expired/invalid
+      if (res.status === 401) {
+        throw Object.assign(new Error('Sesi berakhir, silakan login kembali.'), { code: 'AUTH' });
+      }
       const data = await res.json();
       if (!data.ok) throw Object.assign(new Error(data.error || 'Permintaan gagal.'), { code: data.code || 'SERVER' });
       return data;
@@ -840,6 +839,18 @@
     }
   }
 
+  // Global error handler for unhandled promise rejections
+  window.addEventListener('unhandledrejection', (event) => {
+    const err = event.reason;
+    if (err && err.code === 'AUTH') {
+      event.preventDefault();
+      handleAuthError(err);
+    } else if (err && err.code === 'NETWORK') {
+      event.preventDefault();
+      showOfflineIndicator(true);
+    }
+  });
+
   function handleAuthError(err) {
     if (err && err.code === 'AUTH') {
       logout();
@@ -847,6 +858,221 @@
       return true;
     }
     return false;
+  }
+
+  // ================= OFFLINE QUEUE & SYNC =================
+  const OFFLINE_DB_NAME = 'scanstock-offline';
+  const OFFLINE_STORE = 'pending_scans';
+  let offlineDb = null;
+
+  async function initOfflineDb() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(OFFLINE_DB_NAME, 1);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(OFFLINE_STORE)) {
+          db.createObjectStore(OFFLINE_STORE, { keyPath: 'id', autoIncrement: true });
+        }
+      };
+      req.onsuccess = () => { offlineDb = req.result; resolve(offlineDb); };
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function queueOfflineScan(scanData) {
+    if (!offlineDb) await initOfflineDb();
+    return new Promise((resolve, reject) => {
+      const tx = offlineDb.transaction(OFFLINE_STORE, 'readwrite');
+      tx.objectStore(OFFLINE_STORE).add({ ...scanData, timestamp: Date.now() });
+      tx.oncomplete = () => { updateOfflineBadge(); resolve(); };
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async function getOfflineQueue() {
+    if (!offlineDb) await initOfflineDb();
+    return new Promise((resolve, reject) => {
+      const tx = offlineDb.transaction(OFFLINE_STORE, 'readonly');
+      const req = tx.objectStore(OFFLINE_STORE).getAll();
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function clearOfflineQueue() {
+    if (!offlineDb) await initOfflineDb();
+    return new Promise((resolve, reject) => {
+      const tx = offlineDb.transaction(OFFLINE_STORE, 'readwrite');
+      tx.objectStore(OFFLINE_STORE).clear();
+      tx.oncomplete = () => { updateOfflineBadge(); resolve(); };
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async function removeOfflineItem(id) {
+    if (!offlineDb) await initOfflineDb();
+    return new Promise((resolve, reject) => {
+      const tx = offlineDb.transaction(OFFLINE_STORE, 'readwrite');
+      tx.objectStore(OFFLINE_STORE).delete(id);
+      tx.oncomplete = () => { updateOfflineBadge(); resolve(); };
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async function syncOfflineQueue() {
+    const queue = await getOfflineQueue();
+    if (queue.length === 0) return;
+
+    showOfflineIndicator(true, `Menyinkronkan ${queue.length} item...`);
+
+    for (const item of queue) {
+      try {
+        await api(item.action, item.payload);
+        await removeOfflineItem(item.id);
+      } catch (err) {
+        if (err.code === 'NETWORK') {
+          showOfflineIndicator(true, 'Offline - antrian tersimpan');
+          break; // Stop syncing if still offline
+        }
+        // For other errors, remove the item to avoid blocking queue
+        console.error('Sync failed for item:', item, err);
+        await removeOfflineItem(item.id);
+      }
+    }
+    updateOfflineBadge();
+    showOfflineIndicator(false);
+  }
+
+  function updateOfflineBadge() {
+    getOfflineQueue().then(queue => {
+      const badge = document.getElementById('offlineBadge');
+      if (badge) {
+        badge.textContent = queue.length;
+        badge.style.display = queue.length > 0 ? 'inline-flex' : 'none';
+      }
+    });
+  }
+
+  function showOfflineIndicator(show, message = '') {
+    let indicator = document.getElementById('offlineIndicator');
+    if (!indicator) {
+      indicator = document.createElement('div');
+      indicator.id = 'offlineIndicator';
+      indicator.style.cssText = 'position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:var(--danger);color:white;padding:8px 16px;border-radius:20px;font-size:12px;z-index:9999;display:none;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+      document.body.appendChild(indicator);
+    }
+    if (show) {
+      indicator.textContent = message || '⚠️ Offline - Data tersimpan lokal';
+      indicator.style.display = 'block';
+    } else {
+      indicator.style.display = 'none';
+    }
+  }
+
+  // ================= HAPTIC FEEDBACK =================
+  function hapticFeedback(type = 'light') {
+    if ('vibrate' in navigator) {
+      const patterns = {
+        light: [10],
+        medium: [20],
+        heavy: [30],
+        success: [10, 50, 10],
+        error: [50, 30, 50],
+        warning: [20, 20, 20]
+      };
+      navigator.vibrate(patterns[type] || patterns.light);
+    }
+  }
+
+  // ================= KEYBOARD SHORTCUTS =================
+  function initKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      // Don't trigger shortcuts when typing in inputs
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key.toLowerCase()) {
+          case 'k': // Ctrl+K: Focus search/scan
+            e.preventDefault();
+            const scanInput = document.getElementById('scanInput');
+            if (scanInput) scanInput.focus();
+            break;
+          case 'enter': // Ctrl+Enter: Submit if in modal
+            e.preventDefault();
+            const confirmBtn = document.querySelector('.modal .btn-primary');
+            if (confirmBtn) confirmBtn.click();
+            break;
+        }
+      } else {
+        switch (e.key) {
+          case 'Enter': // Enter: Submit active form
+            const activeModal = document.querySelector('.modal[style*="flex"]');
+            if (activeModal) {
+              const submitBtn = activeModal.querySelector('.btn-primary');
+              if (submitBtn) submitBtn.click();
+            }
+            break;
+          case 'Escape': // Esc: Close modals
+            document.querySelectorAll('.modal[style*="flex"]').forEach(m => m.style.display = 'none');
+            break;
+        }
+      }
+    });
+  }
+
+  // ================= PULL TO REFRESH =================
+  let pullStartY = 0;
+  let pullCurrentY = 0;
+  let isPulling = false;
+
+  function initPullToRefresh() {
+    document.addEventListener('touchstart', (e) => {
+      if (window.scrollY === 0) {
+        pullStartY = e.touches[0].clientY;
+        isPulling = true;
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', (e) => {
+      if (!isPulling) return;
+      pullCurrentY = e.touches[0].clientY;
+      const delta = pullCurrentY - pullStartY;
+      if (delta > 0 && delta < 100) {
+        e.preventDefault();
+        document.body.style.transform = `translateY(${delta * 0.5}px)`;
+        document.body.style.transition = 'none';
+      }
+    }, { passive: false });
+
+    document.addEventListener('touchend', () => {
+      if (!isPulling) return;
+      const delta = pullCurrentY - pullStartY;
+      document.body.style.transition = 'transform 0.3s ease';
+      document.body.style.transform = 'translateY(0)';
+
+      if (delta > 60) {
+        hapticFeedback('medium');
+        refreshData();
+      }
+      isPulling = false;
+      pullStartY = 0;
+      pullCurrentY = 0;
+    });
+  }
+
+  async function refreshData() {
+    const status = document.getElementById('dbStatus');
+    if (status) status.innerText = "🔄 Memperbarui data...";
+    try {
+      await fetchMasterData();
+      if (isAdmin()) await fetchToggleVerifikasi();
+      pollNotif(true);
+      if (status) status.innerText = "✅ Data diperbarui";
+      hapticFeedback('success');
+    } catch (err) {
+      if (status) status.innerText = "❌ Gagal memperbarui: " + err.message;
+      hapticFeedback('error');
+    }
   }
 
   async function fetchMasterData() {
@@ -895,8 +1121,10 @@
       try { localStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch (e) {}
       document.getElementById('loginPass').value = '';
       prosesMasuk();
+      hapticFeedback('success');
     } catch (err) {
       showModal(err.code === 'SERVER' ? "Login Gagal" : "Gagal Login", err.message);
+      hapticFeedback('error');
     } finally {
       btnLogin.disabled = false;
       btnLogin.innerText = "Login";
@@ -936,6 +1164,7 @@
     document.getElementById('aksesBar').style.display = 'none';
     document.getElementById('btnSnd').style.display = 'none';
     aksesData = null; aksesTerbuka = true;
+    hapticFeedback('medium');
   }
 
   function jenisKode(kode) {
@@ -975,6 +1204,7 @@
 
     if (!isScanning) document.getElementById('inputQty').focus();
     card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    hapticFeedback('success');
   }
 
   function produkTidakDitemukan(kode) {
@@ -985,6 +1215,7 @@
     document.getElementById('resPrice').innerText = "Rp 0";
     card.className = "card-result error";
     card.style.display = "block";
+    hapticFeedback('error');
   }
 
   // Kode persis (produk_id atau ISBN), tanpa peduli huruf besar/kecil. Dipakai oleh scanner kamera & foto.
@@ -1020,10 +1251,27 @@
       resumeScanner();
       pollNotif(true);
       showModal("Berhasil Disimpan", `Tercatat (${peranAktif()}) +${qtyVal} Pcs ${activeItem.nama_produk} di ${String(res.sheet || labelSheet()).toUpperCase()}. Total input ${peranAktif().toLowerCase()} untuk produk ini: ${res.total} Pcs.${res.kategori ? ' Kategori: ' + res.kategori + '.' : ''}`);
+      hapticFeedback('success');
     } catch (err) {
       if (handleAuthError(err)) return;
-      if (err.code === 'TUTUP') pollNotif(true);
-      showModal(err.code === 'TUTUP' ? "Input Ditutup" : "Gagal Menyimpan", err.message);
+      // If network error, queue for offline sync
+      if (err.code === 'NETWORK') {
+        try {
+          await queueOfflineScan({ action: 'simpan', payload });
+          showModal("Tersimpan Offline", "Koneksi bermasalah. Data akan disinkronkan saat online kembali.");
+          hapticFeedback('warning');
+        } catch (e) {
+          showModal("Gagal", "Gagal menyimpan offline: " + e.message);
+          hapticFeedback('error');
+        }
+      } else if (err.code === 'TUTUP') {
+        pollNotif(true);
+        showModal("Input Ditutup", err.message);
+        hapticFeedback('error');
+      } else {
+        showModal("Gagal Menyimpan", err.message);
+        hapticFeedback('error');
+      }
     } finally {
       terapkanAkses(aksesData);
     }
@@ -1079,25 +1327,107 @@
   }
 
   async function downloadDataRekap() {
-    const targetCabang = isAdmin() ? 'tes_input' : currentUser.cabang;   // admin: hanya sheet tes_input
+    if (isAdmin()) {
+      // Admin: show modal to select branch and options
+      showExportModal();
+    } else {
+      // Non-admin: export own branch directly
+      await doExportRekap(currentUser.cabang);
+    }
+  }
+
+  function showExportModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.cssText = 'display:flex;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;z-index:1000;';
+    modal.innerHTML = `
+      <div style="background:var(--card);padding:24px;border-radius:12px;width:90%;max-width:400px;">
+        <h3 style="margin:0 0 16px;">📥 Ekspor Rekap</h3>
+        <div style="margin-bottom:12px;">
+          <label style="display:block;margin-bottom:4px;font-weight:500;">Pilih Sheet</label>
+          <select id="exportSheetSelect" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);">
+            <option value="tes_input">Tes Input (Mode Uji)</option>
+            <option value="kranggan">Kranggan</option>
+            <option value="katedral">Katedral</option>
+            <option value="santamaria">Santa Maria</option>
+            <option value="athanasius">Athanasius</option>
+            <option value="antonius">Antonius</option>
+            <option value="paulus">Paulus</option>
+          </select>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="display:block;margin-bottom:4px;font-weight:500;">Rentang Tanggal <span style="color:var(--text-muted);font-weight:normal;font-size:12px;">(perlu dukungan backend)</span></label>
+          <div style="display:flex;gap:8px;">
+            <input type="date" id="exportDateFrom" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);">
+            <input type="date" id="exportDateTo" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
+          <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">Batal</button>
+          <button class="btn btn-primary" onclick="confirmExportRekap()">Ekspor</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    // Set default date range (last 30 days)
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today.getTime() - 30*24*60*60*1000);
+    document.getElementById('exportDateTo').value = today.toISOString().slice(0,10);
+    document.getElementById('exportDateFrom').value = thirtyDaysAgo.toISOString().slice(0,10);
+  }
+
+  window.confirmExportRekap = function() {
+    const sheet = document.getElementById('exportSheetSelect').value;
+    const dateFrom = document.getElementById('exportDateFrom').value;
+    const dateTo = document.getElementById('exportDateTo').value;
+    document.querySelector('.modal').remove();
+    doExportRekap(sheet, dateFrom, dateTo);
+  };
+
+  async function doExportRekap(cabang, dateFrom, dateTo) {
+    const btn = event?.target;
+    if (btn) { btn.disabled = true; btn.innerText = 'Memproses...'; }
 
     try {
-      const res = await api('rekap', { cabang: targetCabang });
+      const res = await api('rekap', { cabang });
       if (!res.data || res.data.length === 0) {
-        return showModal("Informasi", `Belum ada data transaksi di Sheet ${targetCabang.toUpperCase()}`);
+        return showModal("Informasi", `Belum ada data transaksi di Sheet ${cabang.toUpperCase()}`);
       }
+
+      // Client-side date filtering (if backend adds timestamp support in future)
+      let filteredData = res.data;
+      if (dateFrom || dateTo) {
+        // Note: Current backend doesn't return timestamps, so this is placeholder
+        // When backend adds 'tanggal' field to rekap data, uncomment below:
+        /*
+        filteredData = res.data.filter(row => {
+          if (!row.tanggal) return true;
+          const rowDate = new Date(row.tanggal);
+          if (dateFrom && rowDate < new Date(dateFrom)) return false;
+          if (dateTo && rowDate > new Date(dateTo)) return false;
+          return true;
+        });
+        */
+        showModal("Info", "Filter tanggal belum didukung backend. Menampilkan semua data.");
+      }
+
       await loadScriptOnce('vendor/exceljs.min.js');
-      const buf = await buildRekapBuffer(res.data, targetCabang.toUpperCase());
+      const buf = await buildRekapBuffer(filteredData, cabang.toUpperCase());
       const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `Rekap_Perbandingan_${targetCabang.toUpperCase()}_${new Date().toISOString().slice(0,10)}.xlsx`;
+      const dateSuffix = dateFrom && dateTo ? `_${dateFrom}_sd_${dateTo}` : `_${new Date().toISOString().slice(0,10)}`;
+      a.download = `Rekap_Perbandingan_${cabang.toUpperCase()}${dateSuffix}.xlsx`;
       document.body.appendChild(a);
       a.click();
       setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      hapticFeedback('success');
     } catch (err) {
       if (handleAuthError(err)) return;
       showModal("Gagal", "Gagal membuat rekap: " + err.message);
+      hapticFeedback('error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerText = 'Ekspor'; }
     }
   }
 
@@ -1257,10 +1587,12 @@
         () => {}
       );
       isScanning = true;
+      hapticFeedback('medium');
     } catch (err) {
       isScanning = false;
       document.getElementById('reader').style.display = 'none';
       showModal("Kamera Tidak Bisa Dibuka", cameraErrorMessage(err));
+      hapticFeedback('error');
     }
   }
 
@@ -1272,6 +1604,9 @@
       }
     } catch (e) { /* abaikan */ }
     qrScanner = null;
+    isScanning = false;
+    document.getElementById('reader').style.display = 'none';
+    hapticFeedback('light');
     isScanning = false;
     document.getElementById('reader').style.display = 'none';
   }
@@ -1420,9 +1755,13 @@
     document.getElementById('notifPanel').style.display = 'flex';
     renderNotifList();
     pollNotif(true);
+    hapticFeedback('light');
   }
 
-  function closeNotifPanel() { document.getElementById('notifPanel').style.display = 'none'; }
+  function closeNotifPanel() {
+    document.getElementById('notifPanel').style.display = 'none';
+    hapticFeedback('light');
+  }
 
   async function refreshNotif() {
     const b = document.getElementById('btnRefreshNotif');
@@ -1990,13 +2329,16 @@
     try {
       await api('toggle_verif_set', { aktif: akanNyalakan });
       pencocokanVerifAktif = akanNyalakan;
+      try { localStorage.setItem('scanstock.pencocokanVerif', akanNyalakan ? '1' : '0'); } catch (e) {}
       const btn = document.getElementById('btnTogglePencocokanVerif');
       if (btn) btn.textContent = pencocokanVerifAktif ? 'Matikan Pencocokan Verifikator' : 'Aktifkan Pencocokan Verifikator';
       terapkanTogglePencocokanVerif();
       updateBadgeVerifikasi();
       sinkronkanRoleVerifikator();
+      hapticFeedback(akanNyalakan ? 'success' : 'warning');
     } catch (err) {
       showModal('Gagal', 'Tidak dapat menyimpan ke server: ' + err.message);
+      hapticFeedback('error');
     }
   }
 
@@ -2051,6 +2393,7 @@
     try {
       const res = await api('toggle_verif_get', {});
       pencocokanVerifAktif = res.aktif !== false;
+      try { localStorage.setItem('scanstock.pencocokanVerif', pencocokanVerifAktif ? '1' : '0'); } catch (e) {}
       const btn = document.getElementById('btnTogglePencocokanVerif');
       if (btn) btn.textContent = pencocokanVerifAktif ? 'Matikan Pencocokan Verifikator' : 'Aktifkan Pencocokan Verifikator';
       updateBadgeVerifikasi();
@@ -2118,12 +2461,14 @@
     tampilkanStatusRecon();
     document.getElementById('reconModal').style.display = 'flex';
     setTimeout(() => document.getElementById('reconNilai').focus(), 50);
+    hapticFeedback('light');
   }
 
   function closeRecon() {
     if (reconBusy) return;
     document.getElementById('reconModal').style.display = 'none';
     reconItem = null;
+    hapticFeedback('light');
   }
 
   function mintaKonfirmasiRecon() {
@@ -2142,11 +2487,13 @@
         ? `${lain} sudah mengajukan. Jika nilainya sama, data di sheet langsung diperbarui dan menggantikan input kasir (${reconItem.qty_kasir}) serta verifikator (${reconItem.qty_verifikator}). Jika berbeda, kedua pengajuan dibatalkan dan harus diisi ulang.`
         : `Data di sheet baru diperbarui setelah ${lain} mengajukan nilai yang sama.`);
     document.getElementById('confirmModal').style.display = 'flex';
+    hapticFeedback('medium');
   }
 
   function tutupKonfirmasi() {
     if (reconBusy) return;
     document.getElementById('confirmModal').style.display = 'none';
+    hapticFeedback('light');
   }
 
   async function simpanRecon() {
@@ -2165,12 +2512,16 @@
       const lain = namaPeran(peranLain());
       if (res.status === 'selesai') {
         showModal("Pencocokan Selesai", `${it.nama_produk}: nilai ${nilai} Pcs disepakati kedua pihak dan sudah diperbarui di sheet.`);
+        hapticFeedback('success');
       } else if (res.status === 'menunggu') {
         showModal("Pengajuan Tersimpan", `Nilai ${nilai} Pcs tercatat sementara. Data di sheet BELUM berubah. Menunggu ${lain} mengajukan nilai yang sama.`);
+        hapticFeedback('medium');
       } else if (res.status === 'beda') {
         showModal("Nilai Tidak Sama", `Nilai Anda tidak sama dengan pengajuan ${lain}. Kedua pengajuan dibatalkan dan data di sheet tidak berubah. Diskusikan, lalu kedua pihak mengisi ulang.`);
+        hapticFeedback('warning');
       } else {
         showModal("Pengajuan Diproses", "Status pengajuan tidak dikenali. Muat ulang daftar notifikasi untuk melihat keadaan terbaru.");
+        hapticFeedback('light');
       }
     } catch (err) {
       reconBusy = false;
@@ -2182,6 +2533,7 @@
       }
       if (err.code === 'TUTUP') pollNotif(true);
       showModal(err.code === 'STALE' ? "Data Sudah Berubah" : err.code === 'TUTUP' ? "Input Ditutup" : "Gagal Menyimpan", err.message);
+      hapticFeedback('error');
     } finally {
       reconBusy = false;
       yes.disabled = false; yes.innerText = 'Ya, Simpan';
@@ -2189,7 +2541,23 @@
     }
   }
 
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) pollNotif(true); });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      pollNotif(true);
+      syncOfflineQueue(); // Sync offline queue when app becomes visible
+    }
+  });
+
+  // Online/offline detection
+  window.addEventListener('online', () => {
+    showOfflineIndicator(false);
+    syncOfflineQueue();
+    hapticFeedback('success');
+  });
+  window.addEventListener('offline', () => {
+    showOfflineIndicator(true, 'Offline - Data akan disimpan lokal');
+    hapticFeedback('warning');
+  });
 
   // ---------- Mulai ----------
   (function init() {
@@ -2203,6 +2571,17 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
     }
+
+    // Initialize offline DB
+    initOfflineDb().catch(() => {});
+
+    // Initialize keyboard shortcuts & pull-to-refresh
+    initKeyboardShortcuts();
+    initPullToRefresh();
+
+    // Update offline badge periodically
+    updateOfflineBadge();
+    setInterval(updateOfflineBadge, 5000);
 
     // Ambil status toggle verifikator dari server (global semua cabang)
     fetchToggleVerifikasi();

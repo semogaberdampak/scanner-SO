@@ -1,4 +1,4 @@
-﻿/**
+/**
  * System Scan & Stock - Backend API (Google Apps Script)
  *
  * Dipasang sebagai Web App:
@@ -13,11 +13,12 @@
  */
 
 // ===== PENGATURAN =====
-// var PIN_DEFAULT = '';          // PIN Kasir & Verifikator semua cabang
-// var PIN_ADMIN_DEFAULT = '';
-// var PIN_VERIFIKATOR_DEFAULT = ''; // PIN Verifikator saja // PIN Super User (admin) saja
-// Disarankan: isi Script Properties APP_PIN agar PIN tidak ada di kode
-var SESSION_SECONDS = 1 * 60 * 60;   // 6 jam (batas maksimum CacheService)
+// Default PIN values (fallback if Script Properties not set).
+// Disarankan: isi Script Properties APP_PIN, APP_PIN_ADMIN, APP_PIN_VERIFIKATOR agar PIN tidak ada di kode.
+var PIN_DEFAULT = '';
+var PIN_ADMIN_DEFAULT = '';
+var PIN_VERIFIKATOR_DEFAULT = '';
+var SESSION_SECONDS = 6 * 60 * 60;   // 6 jam (batas maksimum CacheService)
 var CABANG_VALID = ['kranggan', 'katedral', 'santamaria', 'athanasius', 'antonius', 'paulus'];
 var ROLE_VALID = ['KASIR', 'VERIFIKATOR'];
 
@@ -194,7 +195,7 @@ function doPost(e) {
       case 'jadwal_get': return json_(jadwalGet_(requireSession_(body)));
       case 'jadwal_set': return json_(jadwalSet_(requireSession_(body), body));
       case 'toggle_verif_get': return json_(toggleVerifGet_(requireSession_(body)));
-      case 'toggle_verif_set': return json_(toggleVerifSet_(efektif_(requireSession_(body), body), body));
+      case 'toggle_verif_set': return json_(toggleVerifSet_(requireSession_(body), body));
 
       default:       return json_({ ok: false, error: 'Aksi tidak dikenal.' });
     }
@@ -238,12 +239,21 @@ function login_(b) {
     }
     var benarVerif = String(props.getProperty('APP_PIN_VERIFIKATOR') || PIN_VERIFIKATOR_DEFAULT);
     if (pin !== benarVerif) { Utilities.sleep(800); return { ok: false, error: 'PIN Verifikator salah.' }; }
+    // Verifikator login sukses
+    var user = { username: 'verifikator_' + cabang, role: 'VERIFIKATOR', cabang: cabang };
+    var token = Utilities.getUuid() + Utilities.getUuid();
+    CacheService.getScriptCache().put('ses_' + token, JSON.stringify(user), SESSION_SECONDS);
+    return { ok: true, token: token, user: user };
   } else {
     // Kasir pakai PIN cabang biasa
     var benarKasir = String(props.getProperty('APP_PIN') || PIN_DEFAULT);
     if (pin !== benarKasir) { Utilities.sleep(800); return { ok: false, error: 'PIN salah.' }; }
+    // Kasir login sukses
+    var user = { username: 'kasir_' + cabang, role: 'KASIR', cabang: cabang };
+    var token = Utilities.getUuid() + Utilities.getUuid();
+    CacheService.getScriptCache().put('ses_' + token, JSON.stringify(user), SESSION_SECONDS);
+    return { ok: true, token: token, user: user };
   }
-  return { ok: false, error: 'Login gagal.' };
 }
 
 // ===== SESI =====

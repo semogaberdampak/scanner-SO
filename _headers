@@ -1,13 +1,30 @@
 /*
-  Permissions-Policy: camera=(self)
+  # Security Headers
   X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
   Referrer-Policy: same-origin
+  Permissions-Policy: camera=(self), microphone=(), geolocation=(), payment=()
+
+  # Content Security Policy - allows inline scripts/styles (needed for this app)
+  # script-src: 'self' 'unsafe-inline' for inline scripts, https://script.google.com for Apps Script API
+  # style-src: 'self' 'unsafe-inline' for inline styles
+  # connect-src: 'self' https://script.google.com for API calls
+  # img-src: 'self' data: blob: for QR codes and exports
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://script.google.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://script.google.com; img-src 'self' data: blob:; font-src 'self'; manifest-src 'self';
 
 /sw.js
-  Cache-Control: no-cache
+  Cache-Control: no-cache, no-store, must-revalidate
+  Service-Worker-Allowed: /
 
 /config.js
-  Cache-Control: no-cache
+  Cache-Control: no-cache, no-store, must-revalidate
 
 /manifest.webmanifest
   Content-Type: application/manifest+json
+  Cache-Control: public, max-age=31536000, immutable
+
+/icons/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/vendor/*
+  Cache-Control: public, max-age=31536000, immutable

@@ -1,0 +1,34 @@
+{
+  "findings": [
+    {
+      "file": "apps-script/Code.gs",
+      "line": 246,
+      "severity": "critical",
+      "comment": "Login for Kasir and Verifikator roles always fails. After successful PIN verification (lines 233-245), the function falls through to `return { ok: false, error: 'Login gagal.' };` at line 246. There is no return statement for successful Kasir/Verifikator login - the function creates no token, stores no session in CacheService, and returns failure. Scenario: A Kasir enters correct PIN for their cabang; the PIN check passes (line 243-244), but the user gets 'Login gagal.' error and cannot access the app."
+    },
+    {
+      "file": "apps-script/Code.gs",
+      "line": 20,
+      "severity": "critical",
+      "comment": "SESSION_SECONDS constant comment says '6 jam' (6 hours) but value is `1 * 60 * 60` = 3600 seconds = 1 hour. Six hours would be `6 * 60 * 60` = 21600 seconds. This causes sessions to expire 6x faster than documented/intended. Scenario: User logs in, expects 6-hour session per comment, but gets logged out after 1 hour of inactivity."
+    },
+    {
+      "file": "apps-script/Code.gs",
+      "line": 16,
+      "severity": "high",
+      "comment": "Config variables PIN_DEFAULT, PIN_ADMIN_DEFAULT, PIN_VERIFIKATOR_DEFAULT are commented out (lines 16-18) but still referenced in login_ function (lines 221, 239, 243). If Script Properties APP_PIN, APP_PIN_ADMIN, APP_PIN_VERIFIKATOR are not set, these will be empty strings, causing all PIN checks to compare against empty string. Scenario: Fresh deployment without Script Properties configured; any PIN (including empty) would match the empty default, allowing unauthorized access, OR no PIN would work if the code expects non-empty values."
+    },
+    {
+      "file": "apps-script/Code.gs",
+      "line": 1,
+      "severity": "medium",
+      "comment": "File starts with BOM (Byte Order Mark) character: `﻿/**`. This invisible character at the very beginning of the file can cause parsing issues in some environments, break shebang lines, or cause issues with tools that expect clean UTF-8. The diff shows the BOM was added in this commit (changed from `/**` to `﻿/**`)."
+    },
+    {
+      "file": "apps-script/Code.gs",
+      "line": 560,
+      "severity": "low",
+      "comment": "File is missing newline at end of file (diff shows `\ No newline at end of file`). This violates POSIX text file conventions and can cause issues with some tools (git, diff, cat, etc.) that expect files to end with a newline."
+    }
+  ]
+}
