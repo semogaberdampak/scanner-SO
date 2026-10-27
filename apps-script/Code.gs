@@ -1,4 +1,4 @@
-/**
+﻿/**
  * System Scan & Stock - Backend API (Google Apps Script)
  *
  * Dipasang sebagai Web App:
@@ -14,7 +14,9 @@
 
 // ===== PENGATURAN =====
 // var PIN_DEFAULT = '';          // PIN Kasir & Verifikator semua cabang
-// var PIN_ADMIN_DEFAULT = '';\n// var PIN_VERIFIKATOR_DEFAULT = ''; // PIN Verifikator saja // PIN Super User (admin) saja          // Disarankan: isi Script Properties APP_PIN agar PIN tidak ada di kode
+// var PIN_ADMIN_DEFAULT = '';
+// var PIN_VERIFIKATOR_DEFAULT = ''; // PIN Verifikator saja // PIN Super User (admin) saja
+// Disarankan: isi Script Properties APP_PIN agar PIN tidak ada di kode
 var SESSION_SECONDS = 1 * 60 * 60;   // 6 jam (batas maksimum CacheService)
 var CABANG_VALID = ['kranggan', 'katedral', 'santamaria', 'athanasius', 'antonius', 'paulus'];
 var ROLE_VALID = ['KASIR', 'VERIFIKATOR'];
@@ -190,7 +192,10 @@ function doPost(e) {
       case 'snd':    return json_(snd_(efektif_(requireSession_(body), body), body));
       case 'rekonsiliasi': return json_(rekonsiliasi_(efektif_(requireSession_(body), body), body));
       case 'jadwal_get': return json_(jadwalGet_(requireSession_(body)));
-      case 'jadwal_set': return json_(jadwalSet_(requireSession_(body), body));\n      case 'toggle_verif_get': return json_(toggleVerifGet_(requireSession_(body)));\n      case 'toggle_verif_set': return json_(toggleVerifSet_(efektif_(requireSession_(body), body), body));
+      case 'jadwal_set': return json_(jadwalSet_(requireSession_(body), body));
+      case 'toggle_verif_get': return json_(toggleVerifGet_(requireSession_(body)));
+      case 'toggle_verif_set': return json_(toggleVerifSet_(efektif_(requireSession_(body), body), body));
+
       default:       return json_({ ok: false, error: 'Aksi tidak dikenal.' });
     }
   } catch (err) {
@@ -208,10 +213,8 @@ function login_(b) {
   var pin = String(b.pin || '').trim();
   var cabang = String(b.cabang || '').toLowerCase().trim();
 
-  // Admin dan cabang memakai PIN yang BERBEDA. Script Properties (APP_PIN_ADMIN / APP_PIN) boleh menggantikan bawaan.
   var props = PropertiesService.getScriptProperties();
-  // Admin, Kasir, dan Verifikator memakai PIN yang BERBEDA.
-  var props = PropertiesService.getScriptProperties();
+  var role = String(b.role || '').toUpperCase();
 
   // Admin: PIN admin tersendiri
   if (cabang === 'admin') {
@@ -240,8 +243,18 @@ function login_(b) {
     var benarKasir = String(props.getProperty('APP_PIN') || PIN_DEFAULT);
     if (pin !== benarKasir) { Utilities.sleep(800); return { ok: false, error: 'PIN salah.' }; }
   }
-  }
-  return JSON.parse(raw);
+  return { ok: false, error: 'Login gagal.' };
+}
+
+// ===== SESI =====
+function requireSession_(b) {
+  var token = String(b.token || '').trim();
+  if (!token) throw { code: 'AUTH', message: 'Token tidak ditemukan. Silakan login ulang.' };
+  var raw = CacheService.getScriptCache().get('ses_' + token);
+  if (!raw) throw { code: 'AUTH', message: 'Sesi habis atau tidak valid. Silakan login ulang.' };
+  var user = JSON.parse(raw);
+  CacheService.getScriptCache().put('ses_' + token, JSON.stringify(user), SESSION_SECONDS); // perpanjang
+  return user;
 }
 
 // ===== DATA =====
@@ -530,8 +543,6 @@ function rekonsiliasi_(user, b) {
     lock.releaseLock();
   }
 }
-
-
 
 // ===== TOGGLE VERIFIKATOR (server-side, semua cabang) =====
 function toggleVerifGet_(user) {
