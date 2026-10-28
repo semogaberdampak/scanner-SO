@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#DFDEDC">
   <script>
     // Terapkan tema tersimpan sedini mungkin agar tidak berkedip
@@ -23,7 +23,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Scan Stock">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <script src="vendor/html5-qrcode.min.js"></script>
   <script src="vendor/qrcode.js"></script>
   <script src="config.js" onerror="window.__configGagal = true; console.error('config.js gagal dimuat - pastikan config.js ada dan API_URL valid')"></script>
   <style>
@@ -173,8 +172,10 @@
     body {
       padding: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px)) calc(12px + var(--safe-area-bottom)) calc(12px + env(safe-area-inset-left, 0px));
       display: flex;
-      justify-content: center;
-      align-items: flex-start;
+      flex-direction: column;
+      align-items: stretch;
+      min-height: 100vh;
+      min-height: 100dvh;
     }
 
     .container {
@@ -220,7 +221,7 @@
     }
 
     .btn {
-      min-height: var(--touch-min);
+      min-height: 48px;
       padding: var(--space-2) var(--space-4);
       border: 1px solid transparent;
       border-radius: var(--radius-md);
@@ -256,9 +257,9 @@
       gap: var(--space-2);
       margin-bottom: var(--space-4);
     }
-    input[type="text"], input[type="number"], input[type="password"], select {
+    input[type="text"], input[type="number"], input[type="password"], input[type="email"], input[type="date"], select, textarea {
       width: 100%;
-      min-height: var(--touch-min);
+      min-height: 48px;
       padding: var(--space-2) var(--space-3);
       border: 1px solid var(--border-strong);
       background: var(--input-bg);
@@ -292,6 +293,10 @@
       font-weight: var(--font-weight-semibold);
       border-radius: var(--radius-sm);
       color: var(--text-muted);
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .segmented-role input[type="radio"]:checked + span {
       background: var(--accent);
@@ -361,6 +366,7 @@
       color: var(--text-main);
       padding: var(--space-5);
       border-radius: var(--radius-xl);
+      max-width: 92vw;
       max-width: 320px;
       width: 100%;
       text-align: center;
@@ -393,7 +399,7 @@
 
     /* ===== Lonceng notifikasi ===== */
     .header-actions { display: flex; align-items: center; gap: var(--space-2); }
-    .bell-btn { position: relative; min-height: 36px; width: 40px; padding: 0; }
+    .bell-btn { position: relative; min-height: 48px; width: 48px; min-width: 48px; padding: 0; }
     .bell-icon { width: 18px; height: 18px; transform-origin: 50% 6%; }
     .bell-btn.has-alert { color: var(--alert); border-color: var(--alert-border); background: var(--alert-bg); }
     .bell-btn.ring .bell-icon { animation: bellRing 1.1s ease-in-out 2; }
@@ -427,7 +433,7 @@
     }
 
     /* ===== Panel notifikasi & modal pencocokan ===== */
-    .modal-box.wide { max-width: 420px; text-align: left; }
+    .modal-box.wide { max-width: 92vw; max-width: 420px; text-align: left; }
     .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-2); margin-bottom: var(--space-1); }
     .panel-sub { font-size: var(--text-xs); color: var(--text-muted); margin-bottom: var(--space-3); }
     .notif-list { display: flex; flex-direction: column; gap: var(--space-2); max-height: 52vh; overflow-y: auto; margin-bottom: var(--space-3); }
@@ -510,8 +516,8 @@
     .chip.lewat { opacity: .65; }
     .chip button { border: none; background: transparent; color: inherit; cursor: pointer; font-size: 15px; line-height: 1; padding: var(--space-1) var(--space-1); border-radius: 50%; font-family: inherit; }
     .cab-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1) var(--space-2); margin: var(--space-1) 0 var(--space-2); }
-    .cab-check { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); padding: var(--space-1) 0; cursor: pointer; }
-    .cab-check input[type="checkbox"] { width: 18px; min-height: 18px; height: 18px; padding: 0; margin: 0; flex: 0 0 auto; }
+    .cab-check { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); padding: var(--space-2) 0; cursor: pointer; min-height: 48px; }
+    .cab-check input[type="checkbox"] { width: 24px; height: 24px; min-height: 24px; min-width: 24px; padding: 0; margin: 0; flex: 0 0 auto; }
     .jadwal-warn { color: var(--alert); font-weight: var(--font-weight-semibold); }
     /* ===== Input SnD (filter produk per supplier) ===== */
     .snd-input { text-align: center; font-size: var(--text-2xl) !important; font-weight: var(--font-weight-extrabold); letter-spacing: 10px; text-transform: uppercase; }
@@ -562,8 +568,8 @@
     /* ===== Kategori produk (checklist Buku Kanisius) ===== */
     .kat-box { background: var(--card-bg-sub); border: 1px solid var(--border-color); border-left: 4px solid var(--accent-line);
       border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); margin-bottom: var(--space-3); }
-    .kat-check { display: flex; align-items: center; gap: var(--space-2); min-height: 34px; font-size: var(--text-base); font-weight: var(--font-weight-bold); cursor: pointer; color: var(--text-main); }
-    .kat-check input[type="checkbox"] { width: 22px; height: 22px; min-height: 22px; padding: 0; margin: 0; flex: 0 0 auto; accent-color: var(--accent); }
+    .kat-check { display: flex; align-items: center; gap: var(--space-2); min-height: 48px; font-size: var(--text-base); font-weight: var(--font-weight-bold); cursor: pointer; color: var(--text-main); }
+    .kat-check input[type="checkbox"] { width: 24px; height: 24px; min-height: 24px; min-width: 24px; padding: 0; margin: 0; flex: 0 0 auto; accent-color: var(--accent); }
     .kat-note { font-size: var(--text-xs); line-height: 1.4; color: var(--text-muted); margin-top: var(--space-1); }
     #qrModal { z-index: 2058; }
     #sndModal { z-index: 2055; }
@@ -631,13 +637,26 @@
     .top-bar-inner {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: center;
+      position: relative;
       padding: var(--space-3) var(--space-4);
       padding-top: calc(var(--space-3) + env(safe-area-inset-top, 0px));
       gap: var(--space-2);
     }
-    .top-bar-left { display: flex; align-items: center; gap: var(--space-2); flex: 1; min-width: 0; }
-    .top-bar-right { display: flex; align-items: center; gap: var(--space-1); flex-shrink: 0; }
+    .top-bar-left {
+      position: absolute;
+      left: calc(var(--space-4) + env(safe-area-inset-left, 0px));
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .top-bar-right {
+      position: absolute;
+      right: calc(var(--space-4) + env(safe-area-inset-right, 0px));
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
+    }
     .app-title {
       margin: 0;
       font-size: var(--text-lg);
@@ -646,6 +665,7 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      text-align: center;
     }
     .branch-badge {
       font-size: var(--text-xs);
@@ -658,9 +678,10 @@
       white-space: nowrap;
     }
     .icon-btn {
-      width: 40px;
-      height: 40px;
-      min-height: 40px;
+      width: 48px;
+      height: 48px;
+      min-height: 48px;
+      min-width: 48px;
       padding: 0;
       display: flex;
       align-items: center;
@@ -676,17 +697,47 @@
     .icon-btn:active { transform: scale(0.95); }
     .icon-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
     .icon-btn:hover { background: var(--card-bg-sub); }
+
+    /* Theme toggle button - allows text content while maintaining 48px touch target */
+    .theme-btn {
+      min-height: 48px;
+      min-width: 48px;
+      padding: 0 var(--space-3);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-1);
+      border: 1px solid var(--border-color);
+      background: var(--input-bg);
+      color: var(--text-main);
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-medium);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 120px;
+      transition: background var(--dur-fast), border-color var(--dur-fast), transform var(--dur-fast);
+    }
+    .theme-btn:active { transform: scale(0.95); }
+    .theme-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+    .theme-btn:hover { background: var(--card-bg-sub); }
+
     .bell-btn.has-alert { color: var(--alert); border-color: var(--alert-border); background: var(--alert-bg); }
     .bell-btn.ring .bell-icon { animation: bellRing 1.1s ease-in-out 2; }
 
     .top-bar-status {
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: var(--space-2);
       padding: 0 var(--space-4) var(--space-3);
       font-size: var(--text-xs);
       color: var(--text-muted);
       flex-wrap: wrap;
+      width: 100%;
+      box-sizing: border-box;
     }
     .status-indicator {
       width: 8px;
@@ -709,7 +760,7 @@
       max-width: 540px;
       margin: 0 auto;
       padding: var(--space-4);
-      padding-bottom: calc(var(--space-4) + 84px + var(--safe-area-bottom)); /* Space for bottom bar */
+      padding-bottom: calc(var(--space-4) + 90px + var(--safe-area-bottom)); /* Space for bottom bar */
       overflow-y: auto;
       box-sizing: border-box;
     }
@@ -797,13 +848,13 @@
     .peran-uji { display: flex; gap: var(--space-2); }
     .peran-uji button {
       flex: 1;
-      min-height: var(--touch-comfortable);
+      min-height: 48px;
       border: 1px solid var(--border-strong);
       background: var(--input-bg);
       color: var(--text-muted);
       border-radius: var(--radius-md);
       font-weight: var(--font-weight-semibold);
-      font-size: var(--text-sm);
+      font-size: var(--text-base);
       font-family: inherit;
       cursor: pointer;
       transition: all var(--dur-fast) var(--ease-out);
@@ -820,6 +871,7 @@
       position: relative;
       width: 100%;
       aspect-ratio: 4/3;
+      max-height: 65vh;
       border-radius: var(--radius-xl);
       overflow: hidden;
       background: #000;
@@ -887,7 +939,12 @@
       z-index: 20;
       pointer-events: auto;
     }
-    .scanner-controls .btn { flex: 1; pointer-events: auto; }
+    .scanner-controls .btn {
+      flex: 1;
+      pointer-events: auto;
+      min-height: 48px;
+      font-size: var(--text-base);
+    }
     .scanner-hint {
       position: absolute;
       bottom: var(--space-3);
@@ -899,6 +956,7 @@
       text-shadow: 0 1px 2px rgba(0,0,0,0.5);
       pointer-events: none;
       z-index: 15;
+      padding: var(--space-2);
     }
 
     /* Manual Input Area */
@@ -920,6 +978,7 @@
     .qty-input { font-size: var(--text-2xl) !important; text-align: center; font-weight: var(--font-weight-bold); }
     .kategori-buttons { display: flex; flex-direction: column; gap: var(--space-2); }
     .kategori-buttons .btn { font-size: var(--text-base); min-height: 48px; }
+    .snd-kategori-btn { min-height: 48px; }
     .kategori-buttons .btn[style*="background: var(--accent-line)"] { background: var(--accent-line) !important; color: #fff !important; }
 
     /* Bottom Bar - Sticky */
@@ -962,7 +1021,7 @@
     .fab:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
     .fab:hover { background: var(--accent-hover); box-shadow: var(--shadow-4); }
     .bottom-actions { display: flex; gap: var(--space-2); align-items: flex-end; }
-    .bottom-actions .icon-btn { width: 44px; height: 44px; border-radius: var(--radius-full); }
+    .bottom-actions .icon-btn { width: 48px; height: 48px; border-radius: var(--radius-full); }
 
     /* Skeleton Loaders */
     .skeleton {
@@ -988,16 +1047,17 @@
 
     /* Responsive */
     @media (min-width: 768px) {
-      .main-content { padding: var(--space-6); padding-bottom: calc(var(--space-6) + 84px + var(--safe-area-bottom)); }
+      .main-content { padding: var(--space-6); padding-bottom: calc(var(--space-6) + 90px + var(--safe-area-bottom)); }
       .top-bar-inner { padding: var(--space-4) var(--space-6); }
       .top-bar-status { padding: 0 var(--space-6) var(--space-3); }
       .bottom-bar { padding: var(--space-3) var(--space-6) calc(var(--space-3) + var(--safe-area-bottom)); }
       .fab { width: 72px; height: 72px; }
       .bottom-actions .icon-btn { width: 48px; height: 48px; }
+      .icon-btn { width: 48px; height: 48px; min-height: 48px; min-width: 48px; }
     }
 
     @media (max-width: 380px) {
-      .main-content { padding: var(--space-3); padding-bottom: calc(var(--space-3) + 78px + var(--safe-area-bottom)); }
+      .main-content { padding: var(--space-3); padding-bottom: calc(var(--space-3) + 84px + var(--safe-area-bottom)); }
       .top-bar-inner { padding: var(--space-2) var(--space-3); }
       .top-bar-status { padding: 0 var(--space-3) var(--space-2); }
       .bottom-bar { padding: var(--space-2) var(--space-3) calc(var(--space-2) + var(--safe-area-bottom)); }
@@ -1005,8 +1065,281 @@
       .app-title { font-size: var(--text-base); }
     }
 
+    /* ===== Mobile UX Enhancements ===== */
+    /* Prevent callout on long press for all interactive elements */
+    button, .btn, .icon-btn, .fab, .segmented-role span, .snd-kategori-btn,
+    .kat-check, .cab-check, .pick-item, .notif-item, .snd-item.klik {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+
+    /* Allow text selection in input fields and text content */
+    input, textarea, select, .prod-title, .prod-id, .pick-nama, .notif-name,
+    .snd-nama, .modal-body, .panel-sub, .recon-note, .screen-subtitle {
+      -webkit-user-select: text;
+      -moz-user-select: text;
+      -ms-user-select: text;
+      user-select: text;
+    }
+
+    /* Improve focus visibility for keyboard navigation */
+    .btn:focus-visible, .icon-btn:focus-visible, .fab:focus-visible,
+    input:focus-visible, select:focus-visible, textarea:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
+      z-index: 10;
+    }
+
+    /* Better scroll behavior on iOS */
+    .main-content {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
+    }
+
+    /* Modal improvements for mobile */
+    .modal-overlay {
+      padding: var(--space-3);
+      padding-top: calc(var(--space-3) + env(safe-area-inset-top, 0px));
+      padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+    }
+    .modal-box {
+      max-height: calc(100vh - var(--space-6) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+      max-height: calc(100dvh - var(--space-6) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Prevent body scroll when modal is open */
+    body.modal-open {
+      overflow: hidden;
+      position: fixed;
+      width: 100%;
+    }
+
+    /* Better input field spacing in modals */
+    .modal-box .form-group,
+    .modal-box .recon-field,
+    .modal-box .snd-input {
+      margin-bottom: var(--space-3);
+    }
+
+    /* Landscape mode improvements for mobile */
+    @media (max-height: 500px) and (orientation: landscape) {
+      .main-content {
+        padding: var(--space-2);
+        padding-bottom: calc(var(--space-2) + 70px + var(--safe-area-bottom));
+      }
+      .scanner-area {
+        aspect-ratio: 16/9;
+        max-height: 50vh;
+      }
+      .top-bar-inner { padding: var(--space-2) var(--space-3); }
+      .top-bar-status { padding: 0 var(--space-3) var(--space-1); }
+      .modal-box {
+        max-height: calc(100vh - var(--space-4));
+        max-height: calc(100dvh - var(--space-4));
+      }
+      .modal-overlay {
+        padding: var(--space-2);
+        align-items: flex-start;
+      }
+      .bottom-bar {
+        padding: var(--space-1) var(--space-3) calc(var(--space-1) + var(--safe-area-bottom));
+      }
+      .fab { width: 52px; height: 52px; }
+    }
+
+    /* Improve text readability on small screens */
+    @media (max-width: 480px) {
+      .modal-title { font-size: var(--text-lg); }
+      .modal-body { font-size: var(--text-base); }
+      .panel-sub { font-size: var(--text-xs); }
+      .price-value { font-size: var(--text-xl); }
+      .qty-input { font-size: var(--text-xl) !important; }
+    }
+
+    /* Better button feedback on touch */
+    .btn:active, .icon-btn:active, .fab:active,
+    .pick-item:active, .notif-item:active, .snd-item.klik:active,
+    .kat-check:active, .cab-check:active {
+      transform: scale(0.98);
+    }
+
     /* Legacy container (remove or keep for modals) */
     .container { max-width: 100%; background: transparent; padding: 0; border-radius: 0; box-shadow: none; border: none; }
+
+    /* ===== Additional Mobile Improvements ===== */
+
+    /* Improve select elements on mobile */
+    select {
+      min-height: 48px;
+      padding-right: 40px; /* Space for dropdown arrow */
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23464545' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+    }
+    [data-theme="dark"] select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23A6A7A2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    }
+
+    /* Better handling for virtual keyboard - prevent content jumping */
+    .input-group:focus-within,
+    .form-group:focus-within {
+      z-index: 5;
+    }
+
+    /* Ensure modals stay visible when keyboard opens */
+    @supports (height: 100dvh) {
+      .modal-overlay {
+        height: 100dvh;
+      }
+    }
+
+    /* Improve scanner area on very small screens */
+    @media (max-width: 320px) {
+      .scanner-area {
+        border-radius: var(--radius-lg);
+        margin-bottom: var(--space-2);
+      }
+      .scanner-controls .btn {
+        min-height: 44px;
+        font-size: var(--text-sm);
+        padding: var(--space-1) var(--space-2);
+      }
+      .btn-lg { min-height: 48px; font-size: var(--text-base); }
+      .fab { width: 52px; height: 52px; }
+      .bottom-actions .icon-btn { width: 44px; height: 44px; }
+    }
+
+    /* Better touch target for checkboxes and radios */
+    input[type="checkbox"], input[type="radio"] {
+      min-width: 20px;
+      min-height: 20px;
+    }
+
+    /* Improve file input label */
+    .photo-input {
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Prevent horizontal scroll on any element */
+    * {
+      max-width: 100%;
+    }
+
+    /* Better visual feedback for disabled buttons */
+    .btn:disabled, .btn[disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    /* Improve loading states */
+    .btn[aria-busy="true"] {
+      position: relative;
+      color: transparent !important;
+    }
+    .btn[aria-busy="true"]::after {
+      content: "";
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    /* Better swipe-to-dismiss for modals (visual hint) */
+    .modal-box::before {
+      content: "";
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 40px;
+      height: 4px;
+      background: var(--border-color);
+      border-radius: 2px;
+      opacity: 0;
+    }
+    .modal-box:focus-within::before,
+    .modal-overlay:focus-within .modal-box::before {
+      opacity: 0.5;
+    }
+
+    /* Better handling for long content in modals */
+    .modal-box .notif-list,
+    .modal-box #sndList,
+    .modal-box #pilihList,
+    .modal-box #notifList,
+    .modal-box #jadwalList {
+      max-height: 50vh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Ensure safe area for notched devices on all edges */
+    .top-bar-inner {
+      padding-left: calc(var(--space-4) + env(safe-area-inset-left, 0px));
+      padding-right: calc(var(--space-4) + env(safe-area-inset-right, 0px));
+    }
+    .top-bar-left {
+      left: calc(var(--space-4) + env(safe-area-inset-left, 0px));
+    }
+    .top-bar-right {
+      right: calc(var(--space-4) + env(safe-area-inset-right, 0px));
+    }
+    .top-bar-status {
+      padding-left: calc(var(--space-4) + env(safe-area-inset-left, 0px));
+      padding-right: calc(var(--space-4) + env(safe-area-inset-right, 0px));
+    }
+    .main-content {
+      padding-left: calc(var(--space-4) + env(safe-area-inset-left, 0px));
+      padding-right: calc(var(--space-4) + env(safe-area-inset-right, 0px));
+    }
+    .bottom-bar {
+      padding-left: calc(var(--space-4) + env(safe-area-inset-left, 0px));
+      padding-right: calc(var(--space-4) + env(safe-area-inset-right, 0px));
+    }
+
+    @media (min-width: 768px) {
+      .top-bar-inner,
+      .top-bar-status,
+      .main-content,
+      .bottom-bar {
+        padding-left: calc(var(--space-6) + env(safe-area-inset-left, 0px));
+        padding-right: calc(var(--space-6) + env(safe-area-inset-right, 0px));
+      }
+      .top-bar-left {
+        left: calc(var(--space-6) + env(safe-area-inset-left, 0px));
+      }
+      .top-bar-right {
+        right: calc(var(--space-6) + env(safe-area-inset-right, 0px));
+      }
+    }
+
+    @media (max-width: 380px) {
+      .top-bar-inner,
+      .top-bar-status,
+      .main-content,
+      .bottom-bar {
+        padding-left: calc(var(--space-3) + env(safe-area-inset-left, 0px));
+        padding-right: calc(var(--space-3) + env(safe-area-inset-right, 0px));
+      }
+      .top-bar-left {
+        left: calc(var(--space-3) + env(safe-area-inset-left, 0px));
+      }
+      .top-bar-right {
+        right: calc(var(--space-3) + env(safe-area-inset-right, 0px));
+      }
+    }
 
     /* Legacy header/user-bar hidden in new layout */
     .header, .user-bar { display: none !important; }
@@ -1163,10 +1496,6 @@
 <header class="top-bar" role="banner">
   <div class="top-bar-inner">
     <div class="top-bar-left">
-      <h1 class="app-title">Scan & Stock</h1>
-      <span id="topBarBranch" class="branch-badge" aria-live="polite"></span>
-    </div>
-    <div class="top-bar-right">
       <button class="icon-btn bell-btn" id="btnBell" style="display: none;" onclick="openNotifPanel()"
               title="Notifikasi selisih" aria-label="Notifikasi selisih kasir dan verifikator">
         <svg class="bell-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1175,7 +1504,11 @@
         </svg>
         <span class="bell-badge" id="bellBadge" style="display: none;" aria-live="polite">0</span>
       </button>
-      <button class="icon-btn" id="btnTheme" onclick="toggleTheme()" aria-label="Toggle tema">🌙</button>
+    </div>
+    <h1 class="app-title">Scan & Stock</h1>
+    <div class="top-bar-right">
+      <span id="topBarBranch" class="branch-badge" aria-live="polite"></span>
+      <button class="theme-btn" id="btnTheme" onclick="toggleTheme()" aria-label="Toggle tema">🌙</button>
     </div>
   </div>
   <div class="top-bar-status" id="topBarStatus">
@@ -1292,7 +1625,7 @@
           <input type="text" id="barcodeInput" placeholder="Scan / ketik kode (boleh sebagian)..." autofocus autocomplete="off" inputmode="text">
           <button type="submit" class="btn btn-primary" style="flex: 0 0 auto;">Cari</button>
         </form>
-        <label class="btn btn-secondary photo-input" style="margin-top: var(--space-2); cursor: pointer; width: 100%;">
+        <label class="btn btn-secondary photo-input btn-lg" style="margin-top: var(--space-2); cursor: pointer; width: 100%; min-height: 48px;">
           📸 Foto dari Galeri
           <input type="file" id="photoInput" accept="image/*" capture="environment" hidden onchange="scanFromPhoto(this)">
         </label>
@@ -1448,7 +1781,7 @@
   <div class="modal-box wide">
     <div class="panel-head">
       <div class="modal-title" style="margin-bottom: 0;">Selisih Kasir &amp; Verifikator</div>
-      <button class="btn btn-secondary" style="min-height: 32px; padding: 2px 10px; font-size: 12px;" onclick="refreshNotif()" id="btnRefreshNotif">↻ Muat ulang</button>
+      <button class="btn btn-secondary btn-sm" style="min-height: 44px; padding: var(--space-1) var(--space-3); font-size: var(--text-sm);" onclick="refreshNotif()" id="btnRefreshNotif">↻ Muat ulang</button>
     </div>
     <div class="panel-sub" id="notifSub">-</div>
     <div class="notif-list" id="notifList"></div>
@@ -1766,6 +2099,7 @@
     // Force reflow to ensure animation plays
     void modalEl.offsetWidth;
     modalEl.classList.add('modal-enter');
+    document.body.classList.add('modal-open');
     // Clean up animation class after it completes
     setTimeout(() => modalEl.classList.remove('modal-enter'), MODAL_ANIMATION_DURATION);
   }
@@ -1776,6 +2110,11 @@
     setTimeout(() => {
       modalEl.style.display = 'none';
       modalEl.classList.remove('modal-exit');
+      // Only remove modal-open if no other modals are open
+      const openModals = document.querySelectorAll('.modal-overlay[style*="flex"]');
+      if (openModals.length === 0) {
+        document.body.classList.remove('modal-open');
+      }
     }, MODAL_ANIMATION_DURATION);
   }
 
@@ -2393,55 +2732,42 @@
 
   function tutupPilihProduk() { closeModal(document.getElementById('pilihModal')); }
 
-  // ================= KAMERA / SCANNER =================
-  let qrScanner = null;
+  // ================= KAMERA / SCANNER (Native BarcodeDetector) =================
+  let scannerStream = null;
+  let scannerVideo = null;
+  let scannerDetector = null;
+  let scannerInterval = null;
   let isScanning = false;
   let lastScan = { code: '', time: 0 };
-
-  function scannerOptions() {
-    const F = Html5QrcodeSupportedFormats;
-    return {
-      formatsToSupport: [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.QR_CODE],
-      experimentalFeatures: { useBarCodeDetectorIfSupported: true }, // jauh lebih akurat untuk barcode 1D di Chrome Android
-      verbose: false
-    };
-  }
-
-  function onScanSuccess(decodedText) {
-    const now = Date.now();
-    if (decodedText === lastScan.code && now - lastScan.time < 2000) return; // cegah baca ganda
-    lastScan = { code: decodedText, time: now };
-    if (navigator.vibrate) navigator.vibrate(60);
-    try { qrScanner.pause(true); } catch (e) {}   // bekukan kamera sampai data disimpan
-    lookupProduct(decodedText);
-    if (!activeItem) setTimeout(resumeScanner, 1500); // produk tidak ketemu -> lanjut scan otomatis
-  }
-
-  function resumeScanner() {
-    if (qrScanner && isScanning) {
-      try { qrScanner.resume(); } catch (e) {}
-    }
-  }
+  let scannerPaused = false;
 
   function cameraErrorMessage(err) {
     const name = (err && err.name) || '';
     const msg = String(err && err.message ? err.message : err);
-    if (!window.isSecureContext) return "Kamera hanya bisa dipakai lewat HTTPS.";
+    if (!window.isSecureContext) return "Kamera hanya bisa dipakai lewat HTTPS (atau localhost).";
     if ((name === 'NotAllowedError' || /permission|denied/i.test(msg)) && window.self !== window.top)
-      return "Google Apps Script memblokir kamera langsung untuk halaman yang tampil di dalam iframe (" + (name || msg) + "). Ini batasan Apps Script, bukan izin browser. Gunakan tombol 📸 Foto, atau scanner barcode Bluetooth/USB.";
+      return "Aplikasi dalam iframe (Apps Script) memblokir kamera. Gunakan tombol 📸 Foto, atau buka di browser langsung.";
     if (name === 'NotAllowedError' || /permission|denied/i.test(msg))
-      return "Akses kamera diblokir (" + (name || msg) + "). Izinkan kamera untuk situs ini di pengaturan browser, dan buka aplikasi lewat Chrome/Safari (bukan browser di dalam WhatsApp/Instagram). Jika tetap gagal, pakai tombol 📸 Foto.";
+      return "Akses kamera diblokir (" + (name || msg) + "). Izinkan kamera di pengaturan browser (icon 🔒 di address bar), buka lewat Chrome/Safari langsung (bukan in-app browser WhatsApp/IG).";
     if (name === 'NotFoundError' || /requested device not found/i.test(msg))
       return "Kamera tidak ditemukan di perangkat ini.";
     if (name === 'NotReadableError' || /could not start video/i.test(msg))
       return "Kamera sedang dipakai aplikasi lain. Tutup aplikasi/tab lain yang memakai kamera, lalu coba lagi.";
+    if (name === 'OverconstrainedError')
+      return "Kamera tidak support konfigurasi yang diminta. Coba ganti kamera atau reload halaman.";
     return "Kamera gagal dibuka: " + (name ? name + " - " : "") + msg;
   }
 
+  // Supported barcode formats for BarcodeDetector
+  const SUPPORTED_FORMATS = ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93', 'codabar', 'data_matrix', 'pdf417'];
+
   async function startScanner() {
-    if (typeof Html5Qrcode === 'undefined')
-      return showModal("Scanner Belum Siap", "Library scanner belum termuat. Periksa koneksi internet lalu muat ulang halaman.");
     if (isScanning) return resumeScanner();
+
+    // Check BarcodeDetector support
+    if (!('BarcodeDetector' in window)) {
+      return showModal("Browser Tidak Support", "Browser ini tidak mendukung BarcodeDetector API native. Gunakan Chrome 88+, Edge 88+, atau Android WebView 88+. Atau gunakan tombol 📸 Foto.");
+    }
 
     // Show scanner preview and hide hint
     const hint = document.getElementById('scannerHint');
@@ -2449,6 +2775,7 @@
     const startBtn = document.getElementById('btnStartScanner');
     const stopBtn = document.getElementById('btnStopScanner');
     const scanFrame = document.getElementById('scanFrame');
+    const readerDiv = document.getElementById('reader');
 
     if (hint) hint.style.display = 'none';
     if (controls) controls.style.display = 'flex';
@@ -2456,32 +2783,164 @@
     if (stopBtn) stopBtn.style.display = 'inline-flex';
     if (scanFrame) scanFrame.style.display = 'block';
 
+    console.log('=== Native Scanner Debug ===');
+    console.log('isSecureContext:', window.isSecureContext);
+    console.log('BarcodeDetector:', 'BarcodeDetector' in window);
+
+    // Enumerate devices for debugging
     try {
-      if (!qrScanner) qrScanner = new Html5Qrcode("reader", scannerOptions());
-      await qrScanner.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: (vw, vh) => {
-            const w = Math.floor(Math.min(vw, 360) * 0.85);
-            return { width: w, height: Math.floor(w * 0.55) };
-          }
-        },
-        onScanSuccess,
-        () => {}
-      );
-      isScanning = true;
-      hapticFeedback('medium');
-    } catch (err) {
-      isScanning = false;
-      if (hint) hint.style.display = 'block';
-      if (controls) controls.style.display = 'none';
-      if (startBtn) startBtn.style.display = 'inline-flex';
-      if (stopBtn) stopBtn.style.display = 'none';
-      if (scanFrame) scanFrame.style.display = 'none';
-      showModal("Kamera Tidak Bisa Dibuka", cameraErrorMessage(err));
-      hapticFeedback('error');
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(d => d.kind === 'videoinput');
+      console.log('Available cameras:', videoDevices.map(d => ({label: d.label, id: d.deviceId})));
+    } catch (e) {
+      console.warn('Cannot enumerate devices:', e);
     }
+
+    // Camera configs to try (mobile: environment first, desktop: any)
+    const cameraConfigs = [
+      { facingMode: { exact: "environment" } },  // Mobile back camera (exact)
+      { facingMode: "environment" },              // Mobile back camera (ideal)
+      { facingMode: { exact: "user" } },          // Mobile front camera (exact)
+      { facingMode: "user" },                     // Mobile front camera (ideal)
+      {}                                           // Any camera (desktop webcam)
+    ];
+
+    let lastError = null;
+
+    for (const config of cameraConfigs) {
+      try {
+        console.log('Trying camera config:', JSON.stringify(config));
+
+        // 1. Get camera stream
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: config,
+          audio: false
+        });
+        console.log('Got stream:', stream.getTracks()[0].getSettings());
+
+        // 2. Create video element
+        scannerVideo = document.createElement('video');
+        scannerVideo.setAttribute('playsinline', 'true');
+        scannerVideo.setAttribute('autoplay', 'true');
+        // Note: Removed 'muted' attribute to ensure camera stream displays properly.
+        // The user has already granted camera permission, and the muted attribute
+        // can interfere with video rendering on some browsers.
+        scannerVideo.style.width = '100%';
+        scannerVideo.style.height = '100%';
+        scannerVideo.style.objectFit = 'cover';
+        scannerVideo.srcObject = stream;
+
+        // Clear reader div and append our video
+        if (readerDiv) {
+          readerDiv.innerHTML = '';
+          readerDiv.appendChild(scannerVideo);
+        }
+
+        // 3. Wait for video metadata loaded (critical!)
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Video metadata timeout')), 10000);
+          scannerVideo.onloadedmetadata = () => {
+            clearTimeout(timeout);
+            console.log('Video ready:', scannerVideo.videoWidth, 'x', scannerVideo.videoHeight);
+            resolve();
+          };
+          scannerVideo.onerror = (e) => {
+            clearTimeout(timeout);
+            reject(new Error('Video error: ' + e.message));
+          };
+          scannerVideo.play().catch(reject);
+        });
+
+        // 4. Create BarcodeDetector
+        scannerDetector = new BarcodeDetector({ formats: SUPPORTED_FORMATS });
+        console.log('BarcodeDetector created, supported formats:', SUPPORTED_FORMATS);
+
+        // 5. Start scanning loop
+        scannerStream = stream;
+        isScanning = true;
+        scannerPaused = false;
+
+        // Scanning function
+        const scanLoop = async () => {
+          if (!isScanning || scannerPaused || !scannerVideo || scannerVideo.readyState < 3) return;
+
+          try {
+            const barcodes = await scannerDetector.detect(scannerVideo);
+            if (barcodes.length > 0) {
+              for (const barcode of barcodes) {
+                const rawValue = barcode.rawValue;
+                if (rawValue && rawValue !== lastScan.code) {
+                  const now = Date.now();
+                  if (rawValue === lastScan.code && now - lastScan.time < 2000) continue;
+                  lastScan = { code: rawValue, time: now };
+
+                  if (navigator.vibrate) navigator.vibrate(60);
+                  pauseScanner();
+                  lookupProduct(rawValue);
+                  if (!activeItem) {
+                    setTimeout(resumeScanner, 1500);
+                  }
+                  return; // Stop scanning after successful detection
+                }
+              }
+            }
+          } catch (e) {
+            // Ignore detection errors, continue loop
+            console.debug('Detection error:', e);
+          }
+        };
+
+        // Run scan loop at ~10fps (100ms interval)
+        scannerInterval = setInterval(scanLoop, 100);
+
+        hapticFeedback('medium');
+        console.log('Native scanner started successfully with config:', config);
+        return; // Success!
+
+      } catch (err) {
+        lastError = err;
+        console.warn('Camera config failed:', config, err);
+        // Cleanup on failure
+        cleanupScanner();
+        continue;
+      }
+    }
+
+    // All configs failed
+    cleanupScanner();
+    isScanning = false;
+
+    if (hint) hint.style.display = 'block';
+    if (controls) controls.style.display = 'none';
+    if (startBtn) startBtn.style.display = 'inline-flex';
+    if (stopBtn) stopBtn.style.display = 'none';
+    if (scanFrame) scanFrame.style.display = 'none';
+
+    const errMsg = cameraErrorMessage(lastError) + "\n\nSudah dicoba: kamera belakang (exact/ideal), depan (exact/ideal), dan otomatis.\nLihat Console (F12) untuk detail error.";
+    showModal("Kamera Tidak Bisa Dibuka", errMsg);
+    hapticFeedback('error');
+  }
+
+  function cleanupScanner() {
+    // Stop scanning loop
+    if (scannerInterval) {
+      clearInterval(scannerInterval);
+      scannerInterval = null;
+    }
+    // Stop video stream
+    if (scannerStream) {
+      scannerStream.getTracks().forEach(t => t.stop());
+      scannerStream = null;
+    }
+    // Remove video element
+    if (scannerVideo) {
+      scannerVideo.srcObject = null;
+      scannerVideo = null;
+    }
+    // Clear reader div
+    const readerDiv = document.getElementById('reader');
+    if (readerDiv) readerDiv.innerHTML = '';
+    scannerDetector = null;
   }
 
   async function stopScanner() {
@@ -2491,14 +2950,9 @@
     const stopBtn = document.getElementById('btnStopScanner');
     const scanFrame = document.getElementById('scanFrame');
 
-    try {
-      if (qrScanner) {
-        if (isScanning) await qrScanner.stop();
-        qrScanner.clear();
-      }
-    } catch (e) { /* abaikan */ }
-    qrScanner = null;
+    cleanupScanner();
     isScanning = false;
+    scannerPaused = false;
 
     // Reset UI
     if (hint) hint.style.display = 'block';
@@ -2510,18 +2964,46 @@
     hapticFeedback('light');
   }
 
+  function pauseScanner() {
+    scannerPaused = true;
+  }
+
+  function resumeScanner() {
+    scannerPaused = false;
+  }
+
   // Cadangan jika kamera langsung diblokir: ambil foto via kamera bawaan HP, lalu baca barcode dari gambar
   async function scanFromPhoto(input) {
     const file = input.files && input.files[0];
     if (!file) return;
+
+    if (!('BarcodeDetector' in window)) {
+      showModal("Browser Tidak Support", "Browser ini tidak mendukung BarcodeDetector API native. Gunakan Chrome 88+, Edge 88+, atau Android WebView 88+.");
+      input.value = '';
+      return;
+    }
+
     try {
-      if (typeof Html5Qrcode === 'undefined') throw new Error('Library scanner belum termuat');
-      const tmp = new Html5Qrcode("reader-file", scannerOptions());
-      const text = await tmp.scanFile(file, false);
-      try { tmp.clear(); } catch (e) {}
-      lookupProduct(text);
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+
+      const detector = new BarcodeDetector({ formats: SUPPORTED_FORMATS });
+      const barcodes = await detector.detect(img);
+
+      URL.revokeObjectURL(img.src);
+
+      if (barcodes.length > 0 && barcodes[0].rawValue) {
+        lookupProduct(barcodes[0].rawValue);
+      } else {
+        showModal("Barcode Tidak Terbaca", "Coba foto lagi dari jarak lebih dekat, pastikan barcode tajam, terang, dan memenuhi frame. Atau ketik kodenya manual.");
+      }
     } catch (err) {
-      showModal("Barcode Tidak Terbaca", "Coba foto lagi dari jarak lebih dekat, pastikan barcode tajam, terang, dan memenuhi frame. Atau ketik kodenya manual.");
+      console.error('scanFromPhoto error:', err);
+      showModal("Barcode Tidak Terbaca", "Terjadi kesalahan saat memproses gambar. Coba lagi atau ketik manual.");
     }
     input.value = '';
   }
