@@ -2333,6 +2333,14 @@
     // Show/hide SND button in bottom bar
     tampilkanTombolSnd();
 
+    // Show camera buttons for authenticated users
+    const startBtn = document.getElementById('btnStartScanner');
+    const fabScan = document.getElementById('fabScan');
+    const stopBtn = document.getElementById('btnStopScanner');
+    if (startBtn) startBtn.style.display = 'inline-flex';
+    if (fabScan) fabScan.style.display = 'inline-flex';
+    if (stopBtn) stopBtn.style.display = 'none';
+
     // Fetch master data
     fetchMasterData();
     startPolling();
@@ -2358,6 +2366,14 @@
 
     // Hide result card
     document.getElementById('resultCard').style.display = 'none';
+
+    // Hide camera buttons on login page
+    const startBtn = document.getElementById('btnStartScanner');
+    const fabScan = document.getElementById('fabScan');
+    const stopBtn = document.getElementById('btnStopScanner');
+    if (startBtn) startBtn.style.display = 'none';
+    if (fabScan) fabScan.style.display = 'none';
+    if (stopBtn) stopBtn.style.display = 'none';
 
     // Reset status
     const statusEl = document.getElementById('dbStatus');
