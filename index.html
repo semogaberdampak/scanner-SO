@@ -24,6 +24,7 @@
   <meta name="apple-mobile-web-app-title" content="Scan Stock">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <script src="vendor/qrcode.js"></script>
+  <script src="vendor/html5-qrcode.min.js"></script>
   <script src="config.js" onerror="window.__configGagal = true; console.error('config.js gagal dimuat - pastikan config.js ada dan API_URL valid')"></script>
   <style>
     /* ==== Palet: hitam #000000 · abu terang #DFDEDC · abu gelap #464545 · teal #00ACAC · abu sedang #A6A7A2 ====
@@ -2732,216 +2733,99 @@
 
   function tutupPilihProduk() { closeModal(document.getElementById('pilihModal')); }
 
-  // ================= KAMERA / SCANNER (Native BarcodeDetector) =================
-  let scannerStream = null;
-  let scannerVideo = null;
-  let scannerDetector = null;
-  let scannerInterval = null;
+  // ================= KAMERA / SCANNER =================
+  let qrScanner = null;
   let isScanning = false;
   let lastScan = { code: '', time: 0 };
-  let scannerPaused = false;
 
   function cameraErrorMessage(err) {
     const name = (err && err.name) || '';
     const msg = String(err && err.message ? err.message : err);
-    if (!window.isSecureContext) return "Kamera hanya bisa dipakai lewat HTTPS (atau localhost).";
+    if (!window.isSecureContext) return "Kamera hanya bisa dipakai lewat HTTPS.";
     if ((name === 'NotAllowedError' || /permission|denied/i.test(msg)) && window.self !== window.top)
-      return "Aplikasi dalam iframe (Apps Script) memblokir kamera. Gunakan tombol 📸 Foto, atau buka di browser langsung.";
+      return "Google Apps Script memblokir kamera langsung untuk halaman yang tampil di dalam iframe (" + (name || msg) + "). Ini batasan Apps Script, bukan izin browser. Gunakan tombol 📸 Foto, atau scanner barcode Bluetooth/USB.";
     if (name === 'NotAllowedError' || /permission|denied/i.test(msg))
-      return "Akses kamera diblokir (" + (name || msg) + "). Izinkan kamera di pengaturan browser (icon 🔒 di address bar), buka lewat Chrome/Safari langsung (bukan in-app browser WhatsApp/IG).";
+      return "Akses kamera diblokir (" + (name || msg) + "). Izinkan kamera untuk situs ini di pengaturan browser, dan buka aplikasi lewat Chrome/Safari (bukan browser di dalam WhatsApp/Instagram). Jika tetap gagal, pakai tombol 📸 Foto.";
     if (name === 'NotFoundError' || /requested device not found/i.test(msg))
       return "Kamera tidak ditemukan di perangkat ini.";
     if (name === 'NotReadableError' || /could not start video/i.test(msg))
       return "Kamera sedang dipakai aplikasi lain. Tutup aplikasi/tab lain yang memakai kamera, lalu coba lagi.";
-    if (name === 'OverconstrainedError')
-      return "Kamera tidak support konfigurasi yang diminta. Coba ganti kamera atau reload halaman.";
     return "Kamera gagal dibuka: " + (name ? name + " - " : "") + msg;
   }
 
-  // Supported barcode formats for BarcodeDetector
-  const SUPPORTED_FORMATS = ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93', 'codabar', 'data_matrix', 'pdf417'];
+  function scannerOptions() {
+    const F = Html5QrcodeSupportedFormats;
+    return {
+      formatsToSupport: [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.QR_CODE],
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+      verbose: false
+    };
+  }
+
+  function onScanSuccess(decodedText) {
+    const now = Date.now();
+    if (decodedText === lastScan.code && now - lastScan.time < 2000) return;
+    lastScan = { code: decodedText, time: now };
+    if (navigator.vibrate) navigator.vibrate(60);
+    try { qrScanner.pause(true); } catch (e) {}
+    lookupProduct(decodedText);
+    if (!activeItem) setTimeout(resumeScanner, 1500);
+  }
+
+  function resumeScanner() {
+    if (qrScanner && isScanning) {
+      try { qrScanner.resume(); } catch (e) {}
+    }
+  }
 
   async function startScanner() {
+    if (typeof Html5Qrcode === 'undefined')
+      return showModal("Scanner Belum Siap", "Library scanner belum termuat. Periksa koneksi internet lalu muat ulang halaman.");
     if (isScanning) return resumeScanner();
 
-    // Check BarcodeDetector support
-    if (!('BarcodeDetector' in window)) {
-      return showModal("Browser Tidak Support", "Browser ini tidak mendukung BarcodeDetector API native. Gunakan Chrome 88+, Edge 88+, atau Android WebView 88+. Atau gunakan tombol 📸 Foto.");
-    }
-
-    // Show scanner preview and hide hint
     const hint = document.getElementById('scannerHint');
     const controls = document.querySelector('.scanner-controls');
     const startBtn = document.getElementById('btnStartScanner');
     const stopBtn = document.getElementById('btnStopScanner');
     const scanFrame = document.getElementById('scanFrame');
-    const readerDiv = document.getElementById('reader');
 
     if (hint) hint.style.display = 'none';
     if (controls) controls.style.display = 'flex';
     if (startBtn) startBtn.style.display = 'none';
     if (stopBtn) stopBtn.style.display = 'inline-flex';
     if (scanFrame) scanFrame.style.display = 'block';
+    const readerEl = document.getElementById('reader');
+    if (readerEl) readerEl.style.display = 'block';
 
-    console.log('=== Native Scanner Debug ===');
-    console.log('isSecureContext:', window.isSecureContext);
-    console.log('BarcodeDetector:', 'BarcodeDetector' in window);
-
-    // Enumerate devices for debugging
     try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(d => d.kind === 'videoinput');
-      console.log('Available cameras:', videoDevices.map(d => ({label: d.label, id: d.deviceId})));
-    } catch (e) {
-      console.warn('Cannot enumerate devices:', e);
-    }
-
-    // Camera configs to try (mobile: environment first, desktop: any)
-    const cameraConfigs = [
-      { facingMode: { exact: "environment" } },  // Mobile back camera (exact)
-      { facingMode: "environment" },              // Mobile back camera (ideal)
-      { facingMode: { exact: "user" } },          // Mobile front camera (exact)
-      { facingMode: "user" },                     // Mobile front camera (ideal)
-      {}                                           // Any camera (desktop webcam)
-    ];
-
-    let lastError = null;
-
-    for (const config of cameraConfigs) {
-      try {
-        console.log('Trying camera config:', JSON.stringify(config));
-
-        // 1. Get camera stream
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: config,
-          audio: false
-        });
-        console.log('Got stream:', stream.getTracks()[0].getSettings());
-
-        // 2. Create video element
-        scannerVideo = document.createElement('video');
-        scannerVideo.setAttribute('playsinline', 'true');
-        scannerVideo.setAttribute('autoplay', 'true');
-        // Note: Removed 'muted' attribute to ensure camera stream displays properly.
-        // The user has already granted camera permission, and the muted attribute
-        // can interfere with video rendering on some browsers.
-        scannerVideo.style.width = '100%';
-        scannerVideo.style.height = '100%';
-        scannerVideo.style.objectFit = 'cover';
-        scannerVideo.srcObject = stream;
-
-        // Clear reader div and append our video
-        if (readerDiv) {
-          readerDiv.innerHTML = '';
-          readerDiv.appendChild(scannerVideo);
-        }
-
-        // 3. Wait for video metadata loaded (critical!)
-        await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('Video metadata timeout')), 10000);
-          scannerVideo.onloadedmetadata = () => {
-            clearTimeout(timeout);
-            console.log('Video ready:', scannerVideo.videoWidth, 'x', scannerVideo.videoHeight);
-            resolve();
-          };
-          scannerVideo.onerror = (e) => {
-            clearTimeout(timeout);
-            reject(new Error('Video error: ' + e.message));
-          };
-          scannerVideo.play().catch(reject);
-        });
-
-        // 4. Create BarcodeDetector
-        scannerDetector = new BarcodeDetector({ formats: SUPPORTED_FORMATS });
-        console.log('BarcodeDetector created, supported formats:', SUPPORTED_FORMATS);
-
-        // 5. Start scanning loop
-        scannerStream = stream;
-        isScanning = true;
-        scannerPaused = false;
-
-        // Scanning function
-        const scanLoop = async () => {
-          if (!isScanning || scannerPaused || !scannerVideo || scannerVideo.readyState < 3) return;
-
-          try {
-            const barcodes = await scannerDetector.detect(scannerVideo);
-            if (barcodes.length > 0) {
-              for (const barcode of barcodes) {
-                const rawValue = barcode.rawValue;
-                if (rawValue && rawValue !== lastScan.code) {
-                  const now = Date.now();
-                  if (rawValue === lastScan.code && now - lastScan.time < 2000) continue;
-                  lastScan = { code: rawValue, time: now };
-
-                  if (navigator.vibrate) navigator.vibrate(60);
-                  pauseScanner();
-                  lookupProduct(rawValue);
-                  if (!activeItem) {
-                    setTimeout(resumeScanner, 1500);
-                  }
-                  return; // Stop scanning after successful detection
-                }
-              }
-            }
-          } catch (e) {
-            // Ignore detection errors, continue loop
-            console.debug('Detection error:', e);
+      if (!qrScanner) qrScanner = new Html5Qrcode("reader", scannerOptions());
+      await qrScanner.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: (vw, vh) => {
+            const w = Math.floor(Math.min(vw, 360) * 0.85);
+            return { width: w, height: Math.floor(w * 0.55) };
           }
-        };
-
-        // Run scan loop at ~10fps (100ms interval)
-        scannerInterval = setInterval(scanLoop, 100);
-
-        hapticFeedback('medium');
-        console.log('Native scanner started successfully with config:', config);
-        return; // Success!
-
-      } catch (err) {
-        lastError = err;
-        console.warn('Camera config failed:', config, err);
-        // Cleanup on failure
-        cleanupScanner();
-        continue;
-      }
+        },
+        onScanSuccess,
+        () => {}
+      );
+      isScanning = true;
+      hapticFeedback('medium');
+    } catch (err) {
+      isScanning = false;
+      if (hint) hint.style.display = 'block';
+      if (controls) controls.style.display = 'none';
+      if (startBtn) startBtn.style.display = 'inline-flex';
+      if (stopBtn) stopBtn.style.display = 'none';
+      if (scanFrame) scanFrame.style.display = 'none';
+      const readerEl = document.getElementById('reader');
+      if (readerEl) readerEl.style.display = 'none';
+      showModal("Kamera Tidak Bisa Dibuka", cameraErrorMessage(err));
+      hapticFeedback('error');
     }
-
-    // All configs failed
-    cleanupScanner();
-    isScanning = false;
-
-    if (hint) hint.style.display = 'block';
-    if (controls) controls.style.display = 'none';
-    if (startBtn) startBtn.style.display = 'inline-flex';
-    if (stopBtn) stopBtn.style.display = 'none';
-    if (scanFrame) scanFrame.style.display = 'none';
-
-    const errMsg = cameraErrorMessage(lastError) + "\n\nSudah dicoba: kamera belakang (exact/ideal), depan (exact/ideal), dan otomatis.\nLihat Console (F12) untuk detail error.";
-    showModal("Kamera Tidak Bisa Dibuka", errMsg);
-    hapticFeedback('error');
-  }
-
-  function cleanupScanner() {
-    // Stop scanning loop
-    if (scannerInterval) {
-      clearInterval(scannerInterval);
-      scannerInterval = null;
-    }
-    // Stop video stream
-    if (scannerStream) {
-      scannerStream.getTracks().forEach(t => t.stop());
-      scannerStream = null;
-    }
-    // Remove video element
-    if (scannerVideo) {
-      scannerVideo.srcObject = null;
-      scannerVideo = null;
-    }
-    // Clear reader div
-    const readerDiv = document.getElementById('reader');
-    if (readerDiv) readerDiv.innerHTML = '';
-    scannerDetector = null;
-  }
+  } // end startScanner
 
   async function stopScanner() {
     const hint = document.getElementById('scannerHint');
@@ -2950,60 +2834,37 @@
     const stopBtn = document.getElementById('btnStopScanner');
     const scanFrame = document.getElementById('scanFrame');
 
-    cleanupScanner();
+    try {
+      if (qrScanner) {
+        if (isScanning) await qrScanner.stop();
+        qrScanner.clear();
+      }
+    } catch (e) {}
+    qrScanner = null;
     isScanning = false;
-    scannerPaused = false;
 
-    // Reset UI
     if (hint) hint.style.display = 'block';
     if (controls) controls.style.display = 'none';
     if (startBtn) startBtn.style.display = 'inline-flex';
     if (stopBtn) stopBtn.style.display = 'none';
     if (scanFrame) scanFrame.style.display = 'none';
+    const readerEl = document.getElementById('reader');
+    if (readerEl) readerEl.style.display = 'none';
 
     hapticFeedback('light');
   }
 
-  function pauseScanner() {
-    scannerPaused = true;
-  }
-
-  function resumeScanner() {
-    scannerPaused = false;
-  }
-
-  // Cadangan jika kamera langsung diblokir: ambil foto via kamera bawaan HP, lalu baca barcode dari gambar
   async function scanFromPhoto(input) {
     const file = input.files && input.files[0];
     if (!file) return;
-
-    if (!('BarcodeDetector' in window)) {
-      showModal("Browser Tidak Support", "Browser ini tidak mendukung BarcodeDetector API native. Gunakan Chrome 88+, Edge 88+, atau Android WebView 88+.");
-      input.value = '';
-      return;
-    }
-
     try {
-      const img = new Image();
-      img.src = URL.createObjectURL(file);
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-      });
-
-      const detector = new BarcodeDetector({ formats: SUPPORTED_FORMATS });
-      const barcodes = await detector.detect(img);
-
-      URL.revokeObjectURL(img.src);
-
-      if (barcodes.length > 0 && barcodes[0].rawValue) {
-        lookupProduct(barcodes[0].rawValue);
-      } else {
-        showModal("Barcode Tidak Terbaca", "Coba foto lagi dari jarak lebih dekat, pastikan barcode tajam, terang, dan memenuhi frame. Atau ketik kodenya manual.");
-      }
+      if (typeof Html5Qrcode === 'undefined') throw new Error('Library scanner belum termuat');
+      const tmp = new Html5Qrcode("reader-file", scannerOptions());
+      const text = await tmp.scanFile(file, false);
+      try { tmp.clear(); } catch (e) {}
+      lookupProduct(text);
     } catch (err) {
-      console.error('scanFromPhoto error:', err);
-      showModal("Barcode Tidak Terbaca", "Terjadi kesalahan saat memproses gambar. Coba lagi atau ketik manual.");
+      showModal("Barcode Tidak Terbaca", "Coba foto lagi dari jarak lebih dekat, pastikan barcode tajam, terang, dan memenuhi frame. Atau ketik kodenya manual.");
     }
     input.value = '';
   }
