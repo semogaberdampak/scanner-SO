@@ -2207,7 +2207,7 @@
     if (status) status.innerText = "🔄 Memperbarui data...";
     try {
       await fetchMasterData();
-      if (isAdmin()) await fetchToggleVerifikasi();
+      await fetchToggleVerifikasi();
       pollNotif(true);
       if (status) status.innerText = "✅ Data diperbarui";
       hapticFeedback('success');
