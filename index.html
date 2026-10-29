@@ -1777,6 +1777,36 @@
   </div>
 </div>
 
+<!-- Modal Input Produk (setelah scan/ketik kode) -->
+<div class="modal-overlay" id="produkModal" role="dialog" aria-modal="true" aria-label="Input Produk">
+  <div class="modal-box">
+    <div class="modal-title" id="produkModalTitle">Produk Ditemukan</div>
+    <div class="modal-body" id="produkModalBody">
+      <div class="prod-id" id="produkModalId">-</div>
+      <div class="prod-title" id="produkModalNama">-</div>
+      <div class="price-row" style="margin-top: var(--space-3);">
+        <span class="price-label">HARGA</span>
+        <span class="price-value" id="produkModalHarga">Rp 0</span>
+      </div>
+    </div>
+    <div class="entry-form" style="margin-top: var(--space-4);">
+      <div class="form-group">
+        <label for="produkModalQty" class="form-label">Jumlah</label>
+        <input type="number" id="produkModalQty" placeholder="1" min="1" value="1" inputmode="numeric" pattern="[0-9]*" class="qty-input" style="width: 100%;">
+      </div>
+      <div id="produkModalKategori" class="kategori-buttons" style="margin-top: var(--space-3);">
+        <button type="button" class="btn btn-secondary btn-block" onclick="pilihKategoriProdukModal('KANISIUS')">Kanisius</button>
+        <button type="button" class="btn btn-secondary btn-block" onclick="pilihKategoriProdukModal('NON_KANISIUS')">Non Kanisius</button>
+        <button type="button" class="btn btn-secondary btn-block" onclick="pilihKategoriProdukModal('EKSTERNAL')">Eksternal</button>
+      </div>
+      <div class="btn-row" style="margin-top: var(--space-3);">
+        <button class="btn btn-secondary" style="flex: 1;" onclick="tutupProdukModal()">Batal</button>
+        <button class="btn btn-primary btn-lg" style="flex: 1;" id="btnProdukModalSimpan" onclick="simpanProdukModal()">Simpan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Panel daftar selisih -->
 <div class="modal-overlay" id="notifPanel">
   <div class="modal-box wide">
