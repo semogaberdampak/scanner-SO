@@ -3827,6 +3827,10 @@
     updateOfflineBadge();
     setInterval(updateOfflineBadge, 5000);
 
+    // Update verifikasi badge periodically (realtime)
+    updateBadgeVerifikasi();
+    setInterval(updateBadgeVerifikasi, 10000);
+
     // Ambil status toggle verifikator dari server (global semua cabang)
     fetchToggleVerifikasi();
   })();
