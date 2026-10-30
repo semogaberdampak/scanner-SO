@@ -117,7 +117,7 @@ Setiap `git push` ke `main` otomatis men-deploy ulang.
 
 - Admin **tidak menyentuh data cabang**. Semua aksi admin diarahkan ke sheet `tes_input`.
 - Admin dapat memilih **peran uji** (Kasir atau Verifikator) untuk menguji alur dua pihak.
-- Ekspor rekap oleh admin juga hanya dari `tes_input`.
+- Ekspor rekap oleh admin bisa memilih `tes_input` atau cabang (hanya baca).
 
 ## Notifikasi selisih & pencocokan
 
@@ -198,8 +198,19 @@ Setiap `git push` ke `main` otomatis men-deploy ulang.
 
 ## Rekap (unduh Excel)
 
-- Setiap peran dapat mengunduh rekap perbandingan Kasir vs Verifikator untuk cabangnya (admin: `tes_input`) sebagai `.xlsx`.
-- Pustaka `exceljs` dimuat hanya saat tombol unduh dipakai. Filter tanggal belum didukung backend (semua data ditampilkan).
+- Tombol unduh di bar bawah membuka modal **Ekspor Rekap** untuk semua peran. File `.xlsx` berisi perbandingan Kasir vs
+  Verifikator, satu baris per produk (nilai terakhir, setelah rekonsiliasi).
+- **Sheet**: Kasir/Verifikator selalu cabangnya sendiri. Admin memilih `tes_input` atau salah satu cabang (hanya baca,
+  tidak mengubah data).
+- **Rentang tanggal (opsional)**: kosongkan untuk semua data. Filter memakai **tanggal input terakhir** tiap produk
+  (yang lebih baru antara waktu Kasir dan waktu Verifikator, zona WIB, batas awal dan akhir ikut). Produk yang belum punya
+  waktu input tidak ikut saat filter dipakai. Format salah atau "Dari" setelah "Sampai" ditolak server.
+- Kolom: `produk_id`, `nama_produk`, `harga`, `qty_kasir`, `qty_verifikator`, `selisih` (rumus D−E), `Kategori`,
+  `waktu_kasir`, `waktu_verifikator`, `keterangan`. Baris yang selisihnya tidak nol diberi latar abu-abu muda;
+  judul dibekukan dan ada filter otomatis.
+- Nama file: `Rekap_Perbandingan_<SHEET>_<tanggal>.xlsx`, dengan akhiran `_<dari>_sd_<sampai>`, `_sejak_<dari>`,
+  atau `_sampai_<sampai>` sesuai filter.
+- Pustaka `exceljs` dimuat hanya saat tombol Ekspor dipakai.
 
 ## Warna
 

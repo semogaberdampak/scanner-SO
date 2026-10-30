@@ -1131,6 +1131,13 @@
     }
     .modal-overlay { overscroll-behavior: contain; }
 
+    /* Kolom dalam baris flex boleh menyusut (input tanggal punya lebar bawaan) agar modal tidak melebar ke samping */
+    .recon-row > * { min-width: 0; }
+    .modal-box { overflow-x: hidden; }
+    .modal-box input, .modal-box select { max-width: 100%; min-width: 0; }
+    #rekapModal .recon-label { display: block; text-align: left; }
+    #rekapModal input[type="date"] { padding-left: var(--space-2); padding-right: var(--space-2); }
+
     /* Better input field spacing in modals */
     .modal-box .form-group,
     .modal-box .recon-field,
@@ -1500,9 +1507,193 @@
       from { opacity: 1; transform: translateY(0) scale(1); }
       to { opacity: 0; transform: translateY(-8px) scale(0.98); }
     }
+
+    /* ===== Latar aurora borealis =====
+       Dua lapisan (terang & gelap) dipertukarkan dengan crossfade sehingga perpindahan tema halus di semua browser.
+       Hanya transform dan opacity yang dianimasikan (dikerjakan GPU). */
+    /* Warna dasar dipegang <html>; <body> transparan agar lapisan aurora (z-index -1) tidak tertutup latar body */
+    html { background-color: var(--bg-primary); transition: background-color 900ms ease; }
+    html body { background: transparent; }
+    .aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; contain: strict; }
+    .aurora-tema { position: absolute; inset: 0; opacity: 0; visibility: hidden;
+      transition: opacity 900ms ease, visibility 0s linear 900ms; }
+    .aurora-terang { opacity: 1; visibility: visible; transition: opacity 900ms ease, visibility 0s; }
+    [data-theme="dark"] .aurora-terang { opacity: 0; visibility: hidden; transition: opacity 900ms ease, visibility 0s linear 900ms; }
+    [data-theme="dark"] .aurora-gelap { opacity: 1; visibility: visible; transition: opacity 900ms ease, visibility 0s; }
+
+    .aurora-tema i {
+      position: absolute; display: block; width: 120vmax; height: 72vmax; border-radius: 50%;
+      background: radial-gradient(closest-side, var(--au) 0%, transparent 100%);
+      will-change: transform;
+    }
+    .aurora-tema i:nth-child(1) { --au: var(--au1); top: -34vmax; left: -36vmax; animation: auroraA 26s ease-in-out infinite alternate; }
+    .aurora-tema i:nth-child(2) { --au: var(--au2); top: 6vmax; right: -48vmax; animation: auroraB 34s ease-in-out infinite alternate; }
+    .aurora-tema i:nth-child(3) { --au: var(--au3); bottom: -38vmax; left: -22vmax; animation: auroraC 42s ease-in-out infinite alternate; }
+    .aurora-gelap  { --au1: rgba(0, 230, 160, .34);  --au2: rgba(56, 120, 255, .30);  --au3: rgba(160, 90, 255, .28); }
+    /* Mode terang: latar abu menelan warna pucat, jadi dipakai warna lebih jenuh dengan opasitas lebih tinggi */
+    .aurora-terang { --au1: rgba(0, 190, 160, .66); --au2: rgba(60, 130, 255, .58); --au3: rgba(165, 100, 255, .54); }
+
+    @keyframes auroraA {
+      0%   { transform: translate3d(-8%, -6%, 0) rotate(-8deg) scale(1); }
+      50%  { transform: translate3d(14%, 10%, 0) rotate(5deg) scale(1.14); }
+      100% { transform: translate3d(2%, 18%, 0) rotate(-3deg) scale(0.96); }
+    }
+    @keyframes auroraB {
+      0%   { transform: translate3d(6%, 4%, 0) rotate(10deg) scale(1.05); }
+      50%  { transform: translate3d(-16%, -4%, 0) rotate(-6deg) scale(0.94); }
+      100% { transform: translate3d(-4%, 14%, 0) rotate(4deg) scale(1.12); }
+    }
+    @keyframes auroraC {
+      0%   { transform: translate3d(0, 4%, 0) rotate(4deg) scale(0.98); }
+      50%  { transform: translate3d(18%, -12%, 0) rotate(-9deg) scale(1.16); }
+      100% { transform: translate3d(8%, -2%, 0) rotate(7deg) scale(1); }
+    }
+
+    /* Kartu sedikit tembus agar warna aurora terasa di balik kartu (teks tetap kontras tinggi). Browser lama: tetap solid. */
+    .card { background: color-mix(in srgb, var(--bg-card) 90%, transparent); }
+    :root:not([data-theme="dark"]) .card { background: color-mix(in srgb, var(--bg-card) 84%, transparent); }
+
+    /* Selama pergantian tema (kelas dipasang ~1 dtk oleh toggleTheme) semua warna berpindah halus */
+    html.tema-transisi, html.tema-transisi *:not(.aurora-tema), html.tema-transisi *::before, html.tema-transisi *::after {
+      transition: background-color 900ms ease, color 900ms ease, border-color 900ms ease,
+                  box-shadow 900ms ease, fill 900ms ease, stroke 900ms ease !important;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .aurora-tema i { animation: none; }
+      .aurora-tema, html { transition-duration: 1ms !important; }
+      html.tema-transisi, html.tema-transisi *:not(.aurora-tema) { transition-duration: 1ms !important; }
+    }
+
+    /* ===== Top bar (dirapikan): kaca transparan, grid 3 kolom, saklar tema ===== */
+    header.top-bar {
+      --tg1: #006868; --tg2: #1D4ED8; --tg3: #6D28D9;       /* gradasi judul (kontras tinggi di mode terang) */
+      background: color-mix(in srgb, var(--bg-card) 78%, transparent);
+      -webkit-backdrop-filter: blur(14px) saturate(1.5);
+      backdrop-filter: blur(14px) saturate(1.5);
+      border-bottom: 1px solid color-mix(in srgb, var(--border-color) 65%, transparent);
+      box-shadow: 0 8px 24px -14px rgba(0, 0, 0, .45);
+    }
+    [data-theme="dark"] header.top-bar { --tg1: #2CCFCF; --tg2: #7DB2FF; --tg3: #C4A1FF; }
+    /* Garis aksen bergradasi di tepi bawah, bergeser pelan */
+    header.top-bar::after {
+      content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; pointer-events: none;
+      background: linear-gradient(90deg, transparent, var(--accent), #4C8DFF, #A56BFF, transparent);
+      background-size: 200% 100%; opacity: .9;
+      animation: barGeser 14s ease-in-out infinite alternate;
+    }
+    @keyframes barGeser { from { background-position: 0% 0; } to { background-position: 100% 0; } }
+
+    header.top-bar .top-bar-inner {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center;
+      column-gap: var(--space-3); position: relative; justify-content: stretch;
+      padding: calc(var(--space-3) + env(safe-area-inset-top, 0px)) calc(var(--space-5) + env(safe-area-inset-right, 0px))
+               var(--space-2) calc(var(--space-5) + env(safe-area-inset-left, 0px));
+    }
+    header.top-bar .top-bar-left, header.top-bar .top-bar-right {
+      position: static; display: flex; align-items: center; gap: var(--space-2); min-width: 0;
+    }
+    header.top-bar .top-bar-left { justify-content: flex-start; }
+    header.top-bar .top-bar-right { justify-content: flex-end; }
+    header.top-bar .bell-btn { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
+
+    header.top-bar .app-title {
+      display: inline-flex; align-items: center; gap: var(--space-2); margin: 0; overflow: visible;
+      font-size: var(--text-lg); font-weight: 800; letter-spacing: .2px; line-height: 1.1;
+    }
+    .app-logo {
+      display: inline-grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: 9px; color: #fff;
+      background: linear-gradient(135deg, var(--accent), #3B82F6 70%, #8B5CF6);
+      box-shadow: 0 3px 10px -3px color-mix(in srgb, var(--accent) 70%, transparent);
+    }
+    .app-logo svg { width: 17px; height: 17px; }
+    .app-name {
+      background: linear-gradient(90deg, var(--tg1), var(--tg2) 60%, var(--tg3));
+      -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
+      white-space: nowrap;
+    }
+
+    /* Baris status: kapsul-kapsul rapi */
+    header.top-bar .top-bar-status {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-2);
+      padding: 0 calc(var(--space-5) + env(safe-area-inset-right, 0px)) var(--space-3) calc(var(--space-5) + env(safe-area-inset-left, 0px));
+    }
+    .status-chip, header.top-bar .branch-badge, header.top-bar .badge-verif {
+      display: inline-flex; align-items: center; gap: 6px; margin: 0; min-height: 24px; box-sizing: border-box;
+      padding: 3px 10px; border-radius: 999px; font-size: var(--text-xs); line-height: 1.2; white-space: nowrap;
+    }
+    .status-chip {
+      background: color-mix(in srgb, var(--card-bg-sub) 82%, transparent);
+      border: 1px solid color-mix(in srgb, var(--border-color) 55%, transparent);
+      color: var(--text-muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+    }
+    header.top-bar .branch-badge { font-weight: var(--font-weight-bold); letter-spacing: .3px; text-transform: uppercase; }
+
+    /* Saklar tema: matahari <-> bulan */
+    .theme-switch {
+      appearance: none; -webkit-appearance: none; border: 0; background: transparent; padding: 6px; margin: 0;
+      min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .ts-track {
+      position: relative; display: block; width: 56px; height: 32px; border-radius: 999px; overflow: hidden; isolation: isolate;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, .28), 0 0 0 1px rgba(0, 0, 0, .10);
+    }
+    .ts-track::before, .ts-track::after { content: ''; position: absolute; inset: 0; transition: opacity 600ms ease; }
+    .ts-track::before { background: linear-gradient(135deg, #9BE7DC, #8EB8FF); }
+    .ts-track::after {
+      opacity: 0;
+      background:
+        radial-gradient(circle at 28% 34%, #fff 0 1px, transparent 1.6px),
+        radial-gradient(circle at 44% 70%, #fff 0 1px, transparent 1.6px),
+        radial-gradient(circle at 18% 68%, rgba(255, 255, 255, .7) 0 .8px, transparent 1.4px),
+        linear-gradient(135deg, #14213D, #3B2A6B);
+    }
+    [data-theme="dark"] .ts-track::after { opacity: 1; }
+    .ts-thumb {
+      position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; z-index: 1;
+      display: grid; place-items: center; background: #FFFFFF; box-shadow: 0 2px 6px rgba(0, 0, 0, .35);
+      transition: transform 450ms cubic-bezier(.34, 1.56, .64, 1);
+    }
+    [data-theme="dark"] .ts-thumb { transform: translateX(24px); background: #E8ECF4; }
+    .ts-ic { grid-area: 1 / 1; width: 16px; height: 16px; transition: opacity 300ms ease, transform 450ms cubic-bezier(.34, 1.56, .64, 1); }
+    .ts-sun { color: #D97706; opacity: 1; transform: none; }
+    .ts-moon { color: #4F46E5; opacity: 0; transform: rotate(-70deg) scale(.5); }
+    [data-theme="dark"] .ts-sun { opacity: 0; transform: rotate(70deg) scale(.5); }
+    [data-theme="dark"] .ts-moon { opacity: 1; transform: none; }
+    .theme-switch:hover .ts-thumb { box-shadow: 0 2px 10px rgba(0, 0, 0, .45); }
+    .theme-switch:active .ts-thumb { width: 30px; }
+    [data-theme="dark"] .theme-switch:active .ts-thumb { width: 30px; transform: translateX(20px); }
+    .theme-switch:focus-visible { outline: none; }
+    .theme-switch:focus-visible .ts-track { outline: 2px solid var(--focus); outline-offset: 3px; }
+    /* Selama pergantian tema, jangan biarkan aturan transisi global mematikan animasi saklar */
+    html.tema-transisi .theme-switch .ts-thumb { transition: transform 450ms cubic-bezier(.34, 1.56, .64, 1) !important; }
+    html.tema-transisi .theme-switch .ts-ic { transition: opacity 300ms ease, transform 450ms cubic-bezier(.34, 1.56, .64, 1) !important; }
+    html.tema-transisi .theme-switch .ts-track::before, html.tema-transisi .theme-switch .ts-track::after { transition: opacity 600ms ease !important; }
+
+    @media (max-width: 380px) {
+      header.top-bar .top-bar-inner { padding-left: calc(var(--space-4) + env(safe-area-inset-left, 0px)); padding-right: calc(var(--space-4) + env(safe-area-inset-right, 0px)); column-gap: var(--space-2); }
+      header.top-bar .top-bar-status { padding-left: calc(var(--space-4) + env(safe-area-inset-left, 0px)); padding-right: calc(var(--space-4) + env(safe-area-inset-right, 0px)); }
+      header.top-bar .app-title { font-size: var(--text-base); }
+      .app-logo { width: 24px; height: 24px; border-radius: 8px; }
+      .app-logo svg { width: 15px; height: 15px; }
+    }
+    @media (min-width: 768px) {
+      header.top-bar .top-bar-inner { padding-left: calc(var(--space-6) + env(safe-area-inset-left, 0px)); padding-right: calc(var(--space-6) + env(safe-area-inset-right, 0px)); }
+      header.top-bar .top-bar-status { padding-left: calc(var(--space-6) + env(safe-area-inset-left, 0px)); padding-right: calc(var(--space-6) + env(safe-area-inset-right, 0px)); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      header.top-bar::after { animation: none; }
+      .ts-thumb, .ts-ic, .ts-track::before, .ts-track::after { transition-duration: 1ms !important; }
+    }
   </style>
 </head>
 <body>
+<!-- Latar aurora borealis (dekoratif) -->
+<div class="aurora" aria-hidden="true">
+  <div class="aurora-tema aurora-terang"><i></i><i></i><i></i></div>
+  <div class="aurora-tema aurora-gelap"><i></i><i></i><i></i></div>
+</div>
 
 <!-- Sticky Top Bar -->
 <header class="top-bar" role="banner">
@@ -1517,15 +1708,30 @@
         <span class="bell-badge" id="bellBadge" style="display: none;" aria-live="polite">0</span>
       </button>
     </div>
-    <h1 class="app-title">Scan & Stock</h1>
+    <h1 class="app-title">
+      <span class="app-logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"></path><path d="M7 12h10"></path></svg>
+      </span>
+      <span class="app-name">Scan &amp; Stock</span>
+    </h1>
     <div class="top-bar-right">
-      <span id="topBarBranch" class="branch-badge" aria-live="polite"></span>
-      <button class="theme-btn" id="btnTheme" onclick="toggleTheme()" aria-label="Toggle tema">🌙</button>
+      <button class="theme-switch" id="btnTheme" type="button" role="switch" aria-checked="false"
+              aria-label="Mode gelap" onclick="toggleTheme()">
+        <span class="ts-track" aria-hidden="true">
+          <span class="ts-thumb">
+            <svg class="ts-ic ts-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path></svg>
+            <svg class="ts-ic ts-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          </span>
+        </span>
+      </button>
     </div>
   </div>
   <div class="top-bar-status" id="topBarStatus">
-    <span class="status-indicator" id="statusIndicator"></span>
-    <span id="dbStatus">Memuat Master Produk...</span>
+    <span id="topBarBranch" class="branch-badge" style="display: none;" aria-live="polite"></span>
+    <span class="status-chip">
+      <span class="status-indicator" id="statusIndicator"></span>
+      <span id="dbStatus">Memuat Master Produk...</span>
+    </span>
     <span id="badgeVerifikasi" class="badge-verif" title="Status pencocokan verifikator">Verif: Memuat…</span>
   </div>
 </header>
@@ -1677,7 +1883,7 @@
 </main>
 
 <!-- Sticky Bottom Action Bar -->
-<footer class="bottom-bar" id="bottomBar" role="contentinfo">
+<footer class="bottom-bar" id="bottomBar" role="contentinfo" style="display: none;">
   <div class="bottom-bar-inner">
     <button class="fab" id="fabScan" onclick="startScanner()" aria-label="Buka kamera scanner">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1756,6 +1962,38 @@
 </div>
 
 <!-- Jadwal input per cabang (admin) -->
+<!-- Ekspor rekap -->
+<div class="modal-overlay" id="rekapModal" role="dialog" aria-modal="true" aria-labelledby="rekapJudul">
+  <div class="modal-box">
+    <div class="modal-title" id="rekapJudul" style="margin-bottom: 4px;">Ekspor Rekap</div>
+    <div class="panel-sub" id="rekapSub">-</div>
+
+    <div id="rekapPilihSheet" style="display: none;">
+      <label class="recon-label" for="rekapSheet">Sheet</label>
+      <select id="rekapSheet" class="recon-field">
+        <option value="tes_input">Tes Input (Mode Uji)</option>
+        <option value="kranggan">Kranggan</option>
+        <option value="katedral">Katedral</option>
+        <option value="santamaria">Santa Maria</option>
+        <option value="athanasius">Athanasius</option>
+        <option value="antonius">Antonius</option>
+        <option value="paulus">Paulus</option>
+      </select>
+    </div>
+
+    <div class="recon-row">
+      <div style="flex: 1;"><label class="recon-label" for="rekapDari">Dari tanggal</label><input type="date" id="rekapDari" class="recon-field"></div>
+      <div style="flex: 1;"><label class="recon-label" for="rekapSampai">Sampai tanggal</label><input type="date" id="rekapSampai" class="recon-field"></div>
+    </div>
+    <div class="panel-sub">Kosongkan tanggal untuk mengunduh semua data. Filter memakai tanggal input terakhir tiap produk (Kasir atau Verifikator).</div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="tutupRekap()">Batal</button>
+      <button class="btn btn-primary" id="btnRekapEkspor" onclick="eksporRekap()">Ekspor</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="jadwalModal">
   <div class="modal-box wide">
     <div class="modal-title" style="margin-bottom: 4px;">Jadwal Input Cabang</div>
@@ -2140,7 +2378,7 @@
 
   // Enter = tombol utama, Esc = tutup, memakai fungsi tutup masing-masing agar pembersihan state tetap jalan.
   // Berlaku juga saat mengetik di kolom input (mis. Enter di kolom Jumlah menyimpan).
-  const MODAL_ENTER_BOLEH = new Set(['produkModal', 'konfirmUmumModal', 'confirmModal', 'reconModal', 'notifyModal']);
+  const MODAL_ENTER_BOLEH = new Set(['produkModal', 'konfirmUmumModal', 'confirmModal', 'reconModal', 'notifyModal', 'rekapModal']);
   const MODAL_PENUTUP = {
     produkModal: () => tutupProdukModal(),
     notifyModal: () => closeNotifyModal(),
@@ -2150,6 +2388,7 @@
     sndModal: () => tutupSnd(),
     sndMetodeModal: () => tutupSndMetode(),
     jadwalModal: () => tutupJadwal(),
+    rekapModal: () => tutupRekap(),
     pilihModal: () => tutupPilihProduk(),
     konfirmUmumModal: () => jawabKonfirmasiUmum(false)
   };
@@ -2465,6 +2704,9 @@
     if (startBtn) startBtn.style.display = 'inline-flex';
     if (fabScan) fabScan.style.display = 'inline-flex';
     if (stopBtn) stopBtn.style.display = 'none';
+    // Bar bawah (kamera, unduh rekap, SnD, keluar) hanya tampil setelah login
+    const bottomBar = document.getElementById('bottomBar');
+    if (bottomBar) bottomBar.style.display = '';
 
     // Fetch master data
     fetchMasterData();
@@ -2499,6 +2741,9 @@
     if (startBtn) startBtn.style.display = 'none';
     if (fabScan) fabScan.style.display = 'none';
     if (stopBtn) stopBtn.style.display = 'none';
+    // Sembunyikan seluruh bar bawah (kamera, unduh rekap, SnD, keluar) di halaman login
+    const bottomBar = document.getElementById('bottomBar');
+    if (bottomBar) bottomBar.style.display = 'none';
 
     // Reset status
     const statusEl = document.getElementById('dbStatus');
@@ -2707,10 +2952,14 @@
       { header: 'qty_kasir', width: 12 },
       { header: 'qty_verifikator', width: 16 },
       { header: 'selisih', width: 10 },
-      { header: 'Kategori', width: 16 }
+      { header: 'Kategori', width: 16 },
+      { header: 'waktu_kasir', width: 20 },
+      { header: 'waktu_verifikator', width: 20 },
+      { header: 'keterangan', width: 48 }
     ];
     ws.getRow(1).font = { bold: true };
     ws.views = [{ state: 'frozen', ySplit: 1 }];
+    ws.autoFilter = 'A1:J1';
 
     rows.forEach((p, i) => {
       const n = i + 2;
@@ -2723,10 +2972,14 @@
         p.qty_kasir,
         p.qty_verifikator,
         { formula: `D${n}-E${n}`, result: selisih },
-        p.kategori || ''
+        p.kategori || '',
+        p.waktu_kasir || '',
+        p.waktu_verifikator || '',
+        p.keterangan || ''
       ]);
-      if (selisih !== 0) {                                       // minus atau plus: kolom A-G abu-abu muda
-        for (let c = 1; c <= 7; c++) {
+      row.getCell(3).numFmt = '#,##0';
+      if (selisih !== 0) {                                       // minus atau plus: kolom A-J abu-abu muda
+        for (let c = 1; c <= 10; c++) {
           row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
         }
       }
@@ -2734,108 +2987,65 @@
     return wb.xlsx.writeBuffer();
   }
 
-  async function downloadDataRekap() {
-    if (isAdmin()) {
-      // Admin: show modal to select branch and options
-      showExportModal();
-    } else {
-      // Non-admin: export own branch directly
-      await doExportRekap(currentUser.cabang);
+  // Tombol Unduh di bar bawah: semua peran memakai modal ini (admin juga memilih sheet)
+  function downloadDataRekap() {
+    const admin = isAdmin();
+    document.getElementById('rekapPilihSheet').style.display = admin ? '' : 'none';
+    document.getElementById('rekapSub').textContent = admin
+      ? 'Pilih sheet dan rentang tanggal (opsional), lalu unduh sebagai file Excel.'
+      : 'Unduh rekap Kasir vs Verifikator cabang Anda sebagai file Excel.';
+    if (admin) document.getElementById('rekapSheet').value = 'tes_input';
+    document.getElementById('rekapDari').value = '';
+    document.getElementById('rekapSampai').value = '';
+    openModal(document.getElementById('rekapModal'));
+  }
+
+  function tutupRekap() { closeModal(document.getElementById('rekapModal')); }
+
+  async function eksporRekap() {
+    const dari = document.getElementById('rekapDari').value;
+    const sampai = document.getElementById('rekapSampai').value;
+    if (dari && sampai && dari > sampai) {
+      return showModal('Tanggal Tidak Valid', 'Tanggal "Dari" tidak boleh setelah tanggal "Sampai".');
     }
-  }
-
-  function showExportModal() {
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.style.cssText = 'display:flex;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;z-index:1000;';
-    modal.innerHTML = `
-      <div style="background:var(--card);padding:24px;border-radius:12px;width:90%;max-width:400px;">
-        <h3 style="margin:0 0 16px;">📥 Ekspor Rekap</h3>
-        <div style="margin-bottom:12px;">
-          <label style="display:block;margin-bottom:4px;font-weight:500;">Pilih Sheet</label>
-          <select id="exportSheetSelect" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);">
-            <option value="tes_input">Tes Input (Mode Uji)</option>
-            <option value="kranggan">Kranggan</option>
-            <option value="katedral">Katedral</option>
-            <option value="santamaria">Santa Maria</option>
-            <option value="athanasius">Athanasius</option>
-            <option value="antonius">Antonius</option>
-            <option value="paulus">Paulus</option>
-          </select>
-        </div>
-        <div style="margin-bottom:12px;">
-          <label style="display:block;margin-bottom:4px;font-weight:500;">Rentang Tanggal <span style="color:var(--text-muted);font-weight:normal;font-size:12px;">(perlu dukungan backend)</span></label>
-          <div style="display:flex;gap:8px;">
-            <input type="date" id="exportDateFrom" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);">
-            <input type="date" id="exportDateTo" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);">
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
-          <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">Batal</button>
-          <button class="btn btn-primary" onclick="confirmExportRekap()">Ekspor</button>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(modal);
-    // Set default date range (last 30 days)
-    const today = new Date();
-    const thirtyDaysAgo = new Date(today.getTime() - 30*24*60*60*1000);
-    document.getElementById('exportDateTo').value = today.toISOString().slice(0,10);
-    document.getElementById('exportDateFrom').value = thirtyDaysAgo.toISOString().slice(0,10);
-  }
-
-  window.confirmExportRekap = function() {
-    const sheet = document.getElementById('exportSheetSelect').value;
-    const dateFrom = document.getElementById('exportDateFrom').value;
-    const dateTo = document.getElementById('exportDateTo').value;
-    document.querySelector('.modal').remove();
-    doExportRekap(sheet, dateFrom, dateTo);
-  };
-
-  async function doExportRekap(cabang, dateFrom, dateTo) {
-    const btn = event?.target;
-    if (btn) { btn.disabled = true; btn.innerText = 'Memproses...'; }
+    const sheet = isAdmin() ? document.getElementById('rekapSheet').value : currentUser.cabang;
+    const btn = document.getElementById('btnRekapEkspor');
+    btn.disabled = true; btn.innerText = 'Memproses...';
 
     try {
-      const res = await api('rekap', { cabang });
+      const payload = { cabang: sheet };
+      if (dari) payload.dari = dari;
+      if (sampai) payload.sampai = sampai;
+      const res = await api('rekap', payload);
+      const label = String(res.cabang || sheet).toUpperCase();
       if (!res.data || res.data.length === 0) {
-        return showModal("Informasi", `Belum ada data transaksi di Sheet ${cabang.toUpperCase()}`);
-      }
-
-      // Client-side date filtering (if backend adds timestamp support in future)
-      let filteredData = res.data;
-      if (dateFrom || dateTo) {
-        // Note: Current backend doesn't return timestamps, so this is placeholder
-        // When backend adds 'tanggal' field to rekap data, uncomment below:
-        /*
-        filteredData = res.data.filter(row => {
-          if (!row.tanggal) return true;
-          const rowDate = new Date(row.tanggal);
-          if (dateFrom && rowDate < new Date(dateFrom)) return false;
-          if (dateTo && rowDate > new Date(dateTo)) return false;
-          return true;
-        });
-        */
-        showModal("Info", "Filter tanggal belum didukung backend. Menampilkan semua data.");
+        return showModal('Informasi', res.disaring
+          ? `Tidak ada produk dengan input pada rentang tanggal itu di sheet ${label}.`
+          : `Belum ada data transaksi di sheet ${label}.`);
       }
 
       await loadScriptOnce('vendor/exceljs.min.js');
-      const buf = await buildRekapBuffer(filteredData, cabang.toUpperCase());
+      const buf = await buildRekapBuffer(res.data, label);
       const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      const dateSuffix = dateFrom && dateTo ? `_${dateFrom}_sd_${dateTo}` : `_${new Date().toISOString().slice(0,10)}`;
-      a.download = `Rekap_Perbandingan_${cabang.toUpperCase()}${dateSuffix}.xlsx`;
+      const hariIni = new Date().toLocaleDateString('sv-SE');      // yyyy-mm-dd menurut zona waktu perangkat
+      const akhiran = dari && sampai ? `_${dari}_sd_${sampai}`
+        : dari ? `_sejak_${dari}`
+        : sampai ? `_sampai_${sampai}`
+        : `_${hariIni}`;
+      a.download = `Rekap_Perbandingan_${label}${akhiran}.xlsx`;
       document.body.appendChild(a);
       a.click();
       setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      tutupRekap();
       hapticFeedback('success');
     } catch (err) {
       if (handleAuthError(err)) return;
-      showModal("Gagal", "Gagal membuat rekap: " + err.message);
+      showModal('Gagal', 'Gagal membuat rekap: ' + err.message);
       hapticFeedback('error');
     } finally {
-      if (btn) { btn.disabled = false; btn.innerText = 'Ekspor'; }
+      btn.disabled = false; btn.innerText = 'Ekspor';
     }
   }
 
@@ -3101,19 +3311,28 @@
     const root = document.documentElement;
     const btn = document.getElementById('btnTheme');
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (theme === 'dark') {
+    const gelap = theme === 'dark';
+    if (gelap) {
       root.setAttribute('data-theme', 'dark');
-      if (btn) btn.innerText = '☀️ Light';
       if (meta) meta.setAttribute('content', '#000000');
     } else {
       root.removeAttribute('data-theme');
-      if (btn) btn.innerText = '🌙 Dark';
       if (meta) meta.setAttribute('content', '#DFDEDC');
+    }
+    if (btn) {
+      btn.setAttribute('aria-checked', gelap ? 'true' : 'false');
+      btn.setAttribute('aria-label', gelap ? 'Mode gelap aktif. Ketuk untuk mode terang' : 'Mode terang aktif. Ketuk untuk mode gelap');
     }
   }
 
+  let temaTimer = null;
   function toggleTheme() {
-    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    const root = document.documentElement;
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    // Pasang kelas transisi sebentar agar semua warna (latar, kartu, teks, garis) berpindah halus
+    root.classList.add('tema-transisi');
+    clearTimeout(temaTimer);
+    temaTimer = setTimeout(() => root.classList.remove('tema-transisi'), 1000);
     applyTheme(next);
     try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
   }
@@ -3147,7 +3366,7 @@
     notif = { count: 0, items: [], menunggu: 0, updated: null };
     notifSeen = false;
     reconItem = null;
-    ['notifPanel', 'reconModal', 'confirmModal', 'pilihModal', 'jadwalModal', 'sndModal', 'qrModal'].forEach(id => document.getElementById(id).style.display = 'none');
+    ['notifPanel', 'reconModal', 'confirmModal', 'pilihModal', 'jadwalModal', 'rekapModal', 'konfirmUmumModal', 'sndModal', 'qrModal'].forEach(id => document.getElementById(id).style.display = 'none');
     const bell = document.getElementById('btnBell');
     bell.style.display = 'none';
     bell.classList.remove('has-alert', 'ring');

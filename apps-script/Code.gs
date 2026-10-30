@@ -373,21 +373,53 @@ function barisAktifSemua_(rows) {
   return { urutan: urutan, aktif: aktif };
 }
 
+// Tanggal (WIB, yyyy-MM-dd) dan teks waktu dari sel timestamp
+function tglWib_(v) { var t = waktu_(v); return t ? Utilities.formatDate(new Date(t), TZ_AKSES, 'yyyy-MM-dd') : ''; }
+function teksWaktu_(v) { var t = waktu_(v); return t ? Utilities.formatDate(new Date(t), TZ_AKSES, FORMAT_WAKTU) : ''; }
+
+// Rekap satu baris per produk (nilai terakhir). Filter tanggal opsional b.dari / b.sampai (yyyy-MM-dd, inklusif)
+// memakai tanggal input TERAKHIR produk itu (yang lebih baru antara waktu kasir dan waktu verifikator).
+// Admin (mode uji) boleh memilih sheet cabang atau tes_input (hanya baca); peran lain hanya cabangnya sendiri.
 function rekap_(user, b) {
-  // Admin: HANYA sheet tes_input. Selain admin: hanya cabangnya sendiri (boleh diunduh kapan saja).
-  var target = user.uji ? SHEET_UJI : user.cabang;
+  b = b || {};
+  var target = user.cabang;
+  if (user.uji) {
+    var pilih = String(b.cabang || '').trim().toLowerCase();
+    target = (pilih === SHEET_UJI || CABANG_VALID.indexOf(pilih) >= 0) ? pilih : SHEET_UJI;
+  }
   if (target !== SHEET_UJI && CABANG_VALID.indexOf(target) < 0) return { ok: false, error: 'Cabang tidak valid.' };
 
+  var dari = b.dari ? String(b.dari) : '', sampai = b.sampai ? String(b.sampai) : '';
+  if (dari && !tanggalValid_(dari)) return { ok: false, error: 'Tanggal "Dari" tidak valid.' };
+  if (sampai && !tanggalValid_(sampai)) return { ok: false, error: 'Tanggal "Sampai" tidak valid.' };
+  if (dari && sampai && dari > sampai) return { ok: false, error: 'Tanggal "Dari" tidak boleh setelah "Sampai".' };
+  var disaring = !!(dari || sampai);
+
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(target);
-  if (!sheet || !cekFormatSheet_(sheet)) return { ok: true, data: [], cabang: target };
+  if (!sheet || !cekFormatSheet_(sheet)) return { ok: true, data: [], cabang: target, disaring: disaring };
 
   // Satu baris per produk: baris terakhir (nilai setelah rekonsiliasi). Baris riwayat tidak ikut dihitung.
   var p = barisAktifSemua_(sheet.getDataRange().getValues());
-  var out = p.urutan.map(function (kode) {
+  var out = [];
+  p.urutan.forEach(function (kode) {
     var r = p.aktif[kode];
-    return { produk_id: kode, nama_produk: r[1], harga: r[2], qty_kasir: Number(r[3]) || 0, qty_verifikator: Number(r[5]) || 0, kategori: String(r[8] || "").trim() };
+    var tk = tglWib_(r[4]), tv = tglWib_(r[6]);
+    var terakhir = tk > tv ? tk : tv;
+    if (disaring) {
+      if (!terakhir) return;                       // belum punya waktu input: tidak bisa ditempatkan pada rentang
+      if (dari && terakhir < dari) return;
+      if (sampai && terakhir > sampai) return;
+    }
+    out.push({
+      produk_id: kode, nama_produk: r[1], harga: r[2],
+      qty_kasir: Number(r[3]) || 0, qty_verifikator: Number(r[5]) || 0,
+      kategori: String(r[8] || '').trim(),
+      tanggal: terakhir,
+      waktu_kasir: teksWaktu_(r[4]), waktu_verifikator: teksWaktu_(r[6]),
+      keterangan: String(r[7] || '').trim()
+    });
   });
-  return { ok: true, data: out, cabang: target };
+  return { ok: true, data: out, cabang: target, disaring: disaring };
 }
 
 // ===== INPUT SnD: filter produk per supplier (HANYA BACA, tidak menyimpan apa pun) =====
