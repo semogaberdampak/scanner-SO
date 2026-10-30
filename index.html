@@ -1722,6 +1722,7 @@
       <button type="button" class="snd-kategori-btn" onclick="pilihKategori('KANISIUS')">Buku Kanisius</button>
       <button type="button" class="snd-kategori-btn" onclick="pilihKategori('NON_KANISIUS')">Buku Non Kanisius</button>
       <button type="button" class="snd-kategori-btn" onclick="pilihKategori('EKSTERNAL')">Eksternal</button>
+      <button type="button" class="btn btn-secondary btn-block" style="margin-top: var(--space-2);" onclick="resetCentangSnd()">Hapus semua centang</button>
     </div>
 
     <label class="recon-label" for="sndKode">Kode supplier (2 karakter)</label>
@@ -2434,6 +2435,8 @@
 
   function prosesMasuk() {
     currentUser = session.user;
+    sndKlikSet = new Set();          // centang SnD dimuat dari server per cabang saat SnD dibuka
+    sndCentangTertunda.clear();
 
     // Switch screens
     document.getElementById('loginSection').classList.remove('active');
@@ -3329,6 +3332,69 @@
   let sndProductMap = new Map();    // kode -> { produk_id, nama_produk, harga, jumlah }
   let inputKategoriTerpilih = null; // 'KANISIUS' | 'NON_KANISIUS' | 'EKSTERNAL' (dari form input qty)
 
+  // ---- Sinkron tanda centang ke server (sheet snd_centang) ----
+  const sndCentangTertunda = new Set();   // sudah dicentang di layar tetapi belum terkirim ke server
+  let sndCentangSedangKirim = false;
+
+  function sinkronRibbonSnd() {
+    document.querySelectorAll('.snd-ribbon').forEach(r => {
+      r.style.display = sndKlikSet.has(r.dataset.kode) ? 'flex' : 'none';
+    });
+  }
+
+  async function kirimCentangTertunda() {
+    if (sndCentangSedangKirim || !sndCentangTertunda.size) return;
+    sndCentangSedangKirim = true;
+    const daftar = Array.from(sndCentangTertunda).slice(0, 200);
+    let berhasil = false;
+    try {
+      await api('snd_centang_set', { kode_list: daftar });
+      daftar.forEach(k => sndCentangTertunda.delete(k));
+      berhasil = true;
+    } catch (err) {
+      handleAuthError(err);   // gagal jaringan: tetap tertunda, dicoba lagi saat centang berikutnya / buka SnD
+    } finally {
+      sndCentangSedangKirim = false;
+    }
+    if (berhasil && sndCentangTertunda.size) kirimCentangTertunda();
+  }
+
+  function catatCentangServer(kode) {
+    sndCentangTertunda.add(kode);
+    kirimCentangTertunda();
+  }
+
+  // Ambil centang tersimpan di server (gabungkan dengan yang ada di layar), lalu perbarui tanda ✓
+  async function muatCentangSnd() {
+    try {
+      await kirimCentangTertunda();
+      const res = await api('snd_centang_get', {});
+      (res.kode || []).forEach(k => sndKlikSet.add(String(k).trim()));
+      sinkronRibbonSnd();
+    } catch (err) {
+      handleAuthError(err);   // gagal: tetap pakai centang yang ada di layar
+    }
+  }
+
+  async function resetCentangSnd() {
+    const ya = await tanyaKonfirmasi(
+      'Hapus Semua Centang?',
+      'Semua tanda centang Input SnD untuk cabang ini akan dihapus dari server dan tidak bisa dikembalikan.',
+      'Ya, Hapus'
+    );
+    if (!ya) return;
+    try {
+      const res = await api('snd_centang_reset', {});
+      sndKlikSet.clear();
+      sndCentangTertunda.clear();
+      sinkronRibbonSnd();
+      showModal('Centang Dihapus', `${res.dihapus || 0} tanda centang dihapus.`);
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      showModal('Gagal Menghapus Centang', err.message);
+    }
+  }
+
   function tampilkanTombolSnd() {
     sEl('btnSnd').style.display = (currentUser && peranAktif() === 'KASIR') ? '' : 'none';
   }
@@ -3374,6 +3440,7 @@
     sEl('sndPager').style.display = 'none';
     sEl('sndKategoriWrapper').style.display = 'block';
     openModal(sEl('sndModal'));
+    muatCentangSnd();
   }
 
   function tutupSnd() {
@@ -3552,6 +3619,7 @@
       const ribbon = document.createElement('div');
       ribbon.className = 'snd-ribbon';
       ribbon.id = 'sndRibbon-' + kode.replace(/[^A-Za-z0-9]/g, '_');
+      ribbon.dataset.kode = kode;
       ribbon.textContent = '✓';
       ribbon.style.display = sndKlikSet.has(kode) ? 'flex' : 'none';
       row.appendChild(ribbon);
@@ -3610,6 +3678,7 @@
   function bukaQr(kode, format = 'QR', withEnter = true) {
     // Tandai produk sebagai sudah diklik
     sndKlikSet.add(kode);
+    catatCentangServer(kode);
     const ribbon = document.getElementById('sndRibbon-' + kode.replace(/[^A-Za-z0-9]/g, '_'));
     if (ribbon) ribbon.style.display = 'flex';
 
@@ -3642,8 +3711,22 @@
     document.getElementById('qrBox').textContent = '';
 
     // Tutup QR saja. JANGAN panggil tutupSnd() karena itu akan menghapus sndKlikSet (ribbon).
-    // Kembali ke tampilan kategori agar ribbon tetap konsisten di semua kategori.
-    // Untuk produk tunggal: user bisa klik "Tutup" di SnD jika ingin keluar sepenuhnya.
+    // Tetap di daftar produk selama masih ada produk yang belum bercentang di daftar yang sedang
+    // tampil (mis. supplier "JR"). Ke pilihan kategori hanya jika semua sudah bercentang, atau
+    // daftar itu hanya berisi satu produk.
+    const items = sndData.items || [];
+    const idxBelum = items.findIndex(it => !sndKlikSet.has(String(it.produk_id).trim()));
+    if (items.length > 1 && idxBelum !== -1) {
+      // Jika halaman yang tampil sudah tercentang semua, pindah ke halaman yang masih punya yang belum
+      const awal = (sndHal - 1) * SND_PER_HAL;
+      const adaBelumDiHalamanIni = items.slice(awal, awal + SND_PER_HAL)
+        .some(it => !sndKlikSet.has(String(it.produk_id).trim()));
+      if (!adaBelumDiHalamanIni) {
+        sndHal = Math.floor(idxBelum / SND_PER_HAL) + 1;
+        renderSnd();
+      }
+      return;
+    }
     kembaliKeKategori();
   }
 

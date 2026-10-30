@@ -168,6 +168,15 @@ Setiap `git push` ke `main` otomatis men-deploy ulang.
 - Hanya produk yang jumlahnya **sudah valid** yang tampil: kedua peran sudah input dan nilainya sama
   (hasil pencocokan atau memang sama sejak awal). Produk yang belum valid dihitung sebagai "belum".
   Saat toggle pencocokan MATI, cukup Kasir yang sudah input.
+- Tanda centang (✓) muncul pada produk yang QR-nya sudah dibuka. Centang **disimpan di server** pada sheet
+  `snd_centang` (kolom `cabang`, `kode_produk`, `waktu`, `oleh`; dibuat otomatis), per cabang (admin: `tes_input`), sehingga
+  tidak hilang saat aplikasi ditutup, besok hari, atau berganti perangkat. Centang dimuat tiap kali Input SnD dibuka.
+  Jika koneksi putus, centang tertahan dan dikirim ulang pada centang berikutnya atau saat SnD dibuka lagi.
+  Untuk memulai siklus baru: tombol **Hapus semua centang** di layar pilihan kategori (menghapus untuk cabang itu saja),
+  atau hapus barisnya langsung di sheet. Setelah QR ditutup, tampilan **tetap di daftar produk**
+  selama masih ada produk yang belum bercentang di daftar itu (mis. supplier `JR`); jika halaman yang tampil sudah
+  tercentang semua, tampilan pindah ke halaman yang masih punya produk belum bercentang. Kembali ke pilihan kategori
+  hanya jika semua produk sudah bercentang, atau daftar hanya berisi satu produk.
 - Fitur ini hanya membaca, tidak menyimpan apa pun ke sheet.
 
 ## QR Code dengan perintah "Enter"
@@ -201,7 +210,8 @@ sengaja di luar palet karena bermakna peringatan.
 
 ## Catatan
 
-- Setelah mengubah file aplikasi (`index.html`, dll.), naikkan nomor `CACHE` di `sw.js` (saat ini `scanstock-v12`,
-  jadi berikutnya `v13`) agar HP mengambil versi terbaru.
+- Setelah mengubah file aplikasi (`index.html`, dll.), naikkan nomor `CACHE` di `sw.js` (saat ini `scanstock-v13`,
+  jadi berikutnya `v14`) agar HP mengambil versi terbaru.
 - Setelah mengubah `Code.gs`, selalu buat versi deployment baru (Deploy > Manage deployments > Edit > New version).
-- Aplikasi memerlukan internet; belum ada antrean offline.
+- Aplikasi memerlukan internet. Jika penyimpanan stok gagal karena koneksi, input masuk antrean offline di browser
+  (badge offline tampil) dan dikirim otomatis saat koneksi kembali atau aplikasi dibuka lagi.

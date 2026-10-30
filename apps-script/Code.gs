@@ -37,6 +37,9 @@ var NOTIF_CACHE_DETIK = 60;
 var SHEET_UJI = 'tes_input';        // sheet khusus uji coba admin (semua fitur, tanpa jadwal)
 var TZ_AKSES = 'Asia/Jakarta';     // "hari ini" untuk jadwal input mengikuti WIB
 var MAKS_TANGGAL = 400;            // batas jumlah tanggal per cabang
+var SHEET_CENTANG = 'snd_centang';  // tanda centang Input SnD, disimpan per cabang agar tidak hilang antar hari/perangkat
+var HEADER_CENTANG = ['cabang', 'kode_produk', 'waktu', 'oleh'];
+var MAKS_CENTANG_SEKALI = 200;     // batas kode per permintaan simpan
 
 // true = judul sudah ada; false = sheet kosong (judul akan dibuat); lempar error jika isinya format lain
 function cekFormatSheet_(sheet) {
@@ -196,6 +199,9 @@ function doPost(e) {
       case 'jadwal_set': return json_(jadwalSet_(requireSession_(body), body));
       case 'toggle_verif_get': return json_(toggleVerifGet_(requireSession_(body)));
       case 'toggle_verif_set': return json_(toggleVerifSet_(requireSession_(body), body));
+      case 'snd_centang_get':   return json_(sndCentangGet_(efektif_(requireSession_(body), body)));
+      case 'snd_centang_set':   return json_(sndCentangSet_(efektif_(requireSession_(body), body), body));
+      case 'snd_centang_reset': return json_(sndCentangReset_(efektif_(requireSession_(body), body)));
 
       default:       return json_({ ok: false, error: 'Aksi tidak dikenal.' });
     }
@@ -418,6 +424,98 @@ function snd_(user, b) {
   });
   items.sort(function (a, b) { return a.produk_id < b.produk_id ? -1 : a.produk_id > b.produk_id ? 1 : 0; });
   return { ok: true, kode2: kode2, items: items, belum: belum, total_pcs: total };
+}
+
+// ===== TANDA CENTANG INPUT SnD =====
+// Satu sheet "snd_centang" berisi: cabang | kode_produk | waktu | oleh. Admin (mode uji) memakai cabang "tes_input".
+// Menghapus baris di sheet ini = menghapus centang produk tersebut.
+function sheetCentang_(ss) {
+  var sheet = ss.getSheetByName(SHEET_CENTANG);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_CENTANG);
+  }
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(HEADER_CENTANG);
+    sheet.setFrozenRows(1);
+    // Kolom kode produk sebagai teks agar angka 0 di depan tidak hilang
+    sheet.getRange(1, 2, sheet.getMaxRows(), 1).setNumberFormat('@');
+  } else if (String(sheet.getRange(1, 1).getValue()).trim().toLowerCase() !== HEADER_CENTANG[0]) {
+    throw new Error('Format sheet "' + SHEET_CENTANG + '" tidak sesuai. Baris 1 harus berisi judul: ' + HEADER_CENTANG.join(', ') + '.');
+  }
+  return sheet;
+}
+
+function sndCentangWajibKasir_(user) {
+  if (user.role !== 'KASIR') return { ok: false, error: 'Fitur Input SnD hanya untuk Kasir.' };
+  return null;
+}
+
+function sndCentangGet_(user) {
+  var salah = sndCentangWajibKasir_(user); if (salah) return salah;
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CENTANG);
+  if (!sheet || sheet.getLastRow() < 2) return { ok: true, kode: [] };
+  var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+  var kode = [];
+  rows.forEach(function (r) {
+    if (String(r[0]).trim() === user.cabang) kode.push(String(r[1]).trim());
+  });
+  return { ok: true, kode: kode };
+}
+
+function sndCentangSet_(user, b) {
+  var salah = sndCentangWajibKasir_(user); if (salah) return salah;
+  var daftar = Array.isArray(b.kode_list) ? b.kode_list : [b.kode];
+  var bersih = [], lihat = {};
+  daftar.forEach(function (k) {
+    k = String(k == null ? '' : k).trim();
+    if (/^[A-Za-z0-9._-]{1,30}$/.test(k) && !lihat[k]) { lihat[k] = true; bersih.push(k); }
+  });
+  if (!bersih.length) return { ok: false, error: 'Kode produk tidak valid.' };
+  if (bersih.length > MAKS_CENTANG_SEKALI) return { ok: false, error: 'Terlalu banyak kode dalam satu permintaan.' };
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sheet = sheetCentang_(SpreadsheetApp.getActiveSpreadsheet());
+    var sudah = {};
+    if (sheet.getLastRow() >= 2) {
+      sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues().forEach(function (r) {
+        if (String(r[0]).trim() === user.cabang) sudah[String(r[1]).trim()] = true;
+      });
+    }
+    var waktuSkrg = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), FORMAT_WAKTU);
+    var baru = [];
+    bersih.forEach(function (k) {
+      if (!sudah[k]) baru.push([user.cabang, k, waktuSkrg, user.username]);
+    });
+    if (baru.length) {
+      sheet.getRange(sheet.getLastRow() + 1, 1, baru.length, 4).setValues(baru);
+    }
+    return { ok: true, ditambah: baru.length };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function sndCentangReset_(user) {
+  var salah = sndCentangWajibKasir_(user); if (salah) return salah;
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CENTANG);
+    if (!sheet || sheet.getLastRow() < 2) return { ok: true, dihapus: 0 };
+    var n = sheet.getLastRow() - 1;
+    var rows = sheet.getRange(2, 1, n, 4).getValues();
+    var sisa = rows.filter(function (r) { return String(r[0]).trim() !== user.cabang; });
+    var dihapus = rows.length - sisa.length;
+    if (dihapus > 0) {
+      sheet.getRange(2, 1, n, 4).clearContent();
+      if (sisa.length) sheet.getRange(2, 1, sisa.length, 4).setValues(sisa);
+    }
+    return { ok: true, dihapus: dihapus };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ===== NOTIFIKASI SELISIH =====
