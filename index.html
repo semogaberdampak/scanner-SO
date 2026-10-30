@@ -2871,11 +2871,22 @@
     return "Kamera gagal dibuka: " + (name ? name + " - " : "") + msg;
   }
 
+  // Pembaca barcode bawaan browser (BarcodeDetector) hanya andal di Chrome murni. Di browser lain
+  // (Samsung Internet, Brave, Edge, Opera, Mi Browser, dll.) fiturnya bisa ada tetapi tidak membaca
+  // apa pun, dan scanner terlanjur memakainya. Di sana dipakai pembaca JavaScript bawaan library.
+  function pakaiDetektorBawaan() {
+    const ua = navigator.userAgent || '';
+    return /Chrome\//.test(ua) &&
+      !/(Edg|EdgA|EdgiOS|OPR|OPT|SamsungBrowser|MiuiBrowser|XiaoMi|UCBrowser|HeyTap|Vivaldi|YaBrowser|Firefox|FxiOS)/i.test(ua) &&
+      !navigator.brave &&
+      typeof window.BarcodeDetector !== 'undefined';
+  }
+
   function scannerOptions() {
     const F = Html5QrcodeSupportedFormats;
     return {
       formatsToSupport: [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.QR_CODE],
-      experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+      experimentalFeatures: { useBarCodeDetectorIfSupported: pakaiDetektorBawaan() },
       verbose: false
     };
   }
