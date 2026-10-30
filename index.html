@@ -406,8 +406,8 @@
     .bell-btn.has-alert { color: var(--alert); border-color: var(--alert-border); background: var(--alert-bg); }
     .bell-btn.ring .bell-icon { animation: bellRing 1.1s ease-in-out 2; }
     .badge-verif { display: inline-flex; align-items: center; gap: var(--space-1); padding: var(--space-1) var(--space-2); border-radius: var(--radius-full); font-size: var(--text-xs); font-weight: var(--font-weight-bold); color: #FFFFFF; margin-left: var(--space-1); white-space: nowrap; }
-    .badge-verif.aktif { background: #22c55e; }
-    .badge-verif.nonaktif { background: #ef4444; }
+    .badge-verif.aktif { background: #15803D; }
+    .badge-verif.nonaktif { background: #DC2626; }
     .segmented-role label.disabled { opacity: 0.5; pointer-events: none; }
     @keyframes bellRing {
       0% { transform: rotate(0); }
@@ -933,13 +933,24 @@
 
     .scanner-controls {
       position: absolute;
-      bottom: var(--space-3);
-      left: var(--space-3);
-      right: var(--space-3);
+      inset: var(--space-3);
       display: flex;
+      align-items: flex-end;
       gap: var(--space-2);
       z-index: 20;
-      pointer-events: auto;
+      pointer-events: none;
+    }
+    /* Tombol Tutup di pojok kanan atas supaya QR di bagian bawah video tidak tertutup */
+    #btnStopScanner {
+      position: absolute;
+      top: 0;
+      right: 0;
+      flex: none !important;
+      width: auto;
+      min-width: 48px;
+      padding-left: var(--space-4);
+      padding-right: var(--space-4);
+      box-shadow: var(--shadow-2, 0 2px 8px rgba(0,0,0,0.35));
     }
     .scanner-controls .btn {
       flex: 1;
@@ -1559,7 +1570,7 @@
 
       <div class="form-group">
         <label for="loginPass" class="form-label">PIN / Password</label>
-        <input type="password" id="loginPass" placeholder="Masukkan PIN / Password" inputmode="numeric" autocomplete="off">
+        <input type="password" id="loginPass" placeholder="Masukkan PIN / Password" inputmode="numeric" enterkeyhint="go" autocomplete="off">
       </div>
 
       <button class="btn btn-primary btn-block" id="btnLogin" onclick="login()">Login</button>
@@ -1582,7 +1593,7 @@
           <span class="admin-badge">MODE UJI ADMIN</span>
           <span class="admin-sheet">data → sheet <strong>tes_input</strong></span>
         </div>
-        <p class="card-subtitle">Scan, input, lonceng, pencocokan, dan rekap semuanya memakai sheet <strong>tes_input</strong> dan tidak terkena jadwal. Ganti peran di bawah untuk menguji alur dua pihak sendirian.</p>
+        <p class="card-subtitle">Tidak terkena jadwal. Ganti peran untuk menguji alur dua pihak sendirian.</p>
         <div class="peran-uji" role="group" aria-label="Peran uji">
           <button type="button" id="btnPeranKASIR" onclick="setPeranUji('KASIR')">Sebagai Kasir</button>
           <button type="button" id="btnPeranVERIFIKATOR" onclick="setPeranUji('VERIFIKATOR')">Sebagai Verifikator</button>
@@ -1614,9 +1625,9 @@
             </svg>
             <span>Buka Kamera</span>
           </button>
-          <button class="btn btn-secondary btn-lg" id="btnStopScanner" onclick="stopScanner()" style="display: none;">Tutup</button>
+          <button class="btn btn-secondary btn-lg" id="btnStopScanner" onclick="stopScanner()" style="display: none;" aria-label="Tutup kamera">✕ Tutup</button>
         </div>
-        <div class="scanner-hint" id="scannerHint">Ketuk tombol kamera kiri bawah untuk scan</div>
+        <div class="scanner-hint" id="scannerHint">Ketuk tombol di atas untuk memulai scanner</div>
       </div>
 
       <!-- Manual Input Alternative -->
@@ -1853,6 +1864,18 @@
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="tutupKonfirmasi()">Batal</button>
       <button class="btn btn-primary" id="btnReconYa" onclick="simpanRecon()">Ya, Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- Konfirmasi umum (pengganti confirm() bawaan browser) -->
+<div class="modal-overlay" id="konfirmUmumModal" role="alertdialog" aria-modal="true" aria-labelledby="konfirmUmumJudul">
+  <div class="modal-box">
+    <div class="modal-title" id="konfirmUmumJudul">Konfirmasi</div>
+    <div class="modal-body" id="konfirmUmumPesan"></div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="jawabKonfirmasiUmum(false)">Batal</button>
+      <button class="btn btn-primary" id="konfirmUmumYa" onclick="jawabKonfirmasiUmum(true)">Ya</button>
     </div>
   </div>
 </div>
@@ -2100,33 +2123,86 @@
             break;
           case 'enter': // Ctrl+Enter: Submit if in modal
             e.preventDefault();
-            const confirmBtn = document.querySelector('.modal .btn-primary');
+            const confirmBtn = modalTerbukaTeratas()?.querySelector('.btn-primary:not([disabled])');
             if (confirmBtn) confirmBtn.click();
-            break;
-        }
-      } else {
-        switch (e.key) {
-          case 'Enter': // Enter: Submit active form
-            const activeModal = document.querySelector('.modal[style*="flex"]');
-            if (activeModal) {
-              const submitBtn = activeModal.querySelector('.btn-primary');
-              if (submitBtn) submitBtn.click();
-            }
-            break;
-          case 'Escape': // Esc: Close modals with animation
-            document.querySelectorAll('.modal[style*="flex"]').forEach(m => closeModal(m));
             break;
         }
       }
     });
   }
 
+  // Modal yang sedang tampil paling atas (yang terakhir di DOM menutupi yang sebelumnya)
+  function modalTerbukaTeratas() {
+    const buka = Array.from(document.querySelectorAll('.modal-overlay')).filter(m => m.style.display === 'flex');
+    return buka.length ? buka[buka.length - 1] : null;
+  }
+
+  // Enter = tombol utama, Esc = tutup, memakai fungsi tutup masing-masing agar pembersihan state tetap jalan.
+  // Berlaku juga saat mengetik di kolom input (mis. Enter di kolom Jumlah menyimpan).
+  const MODAL_ENTER_BOLEH = new Set(['produkModal', 'konfirmUmumModal', 'confirmModal', 'reconModal', 'notifyModal']);
+  const MODAL_PENUTUP = {
+    produkModal: () => tutupProdukModal(),
+    notifyModal: () => closeNotifyModal(),
+    notifPanel: () => closeNotifPanel(),
+    reconModal: () => closeRecon(),
+    confirmModal: () => tutupKonfirmasi(),
+    sndModal: () => tutupSnd(),
+    sndMetodeModal: () => tutupSndMetode(),
+    jadwalModal: () => tutupJadwal(),
+    pilihModal: () => tutupPilihProduk(),
+    konfirmUmumModal: () => jawabKonfirmasiUmum(false)
+  };
+  document.addEventListener('keydown', (e) => {
+    if (e.defaultPrevented || e.isComposing) return;
+
+    // Login: Enter / tombol "Go" di keyboard HP
+    if (e.key === 'Enter' && e.target && e.target.id === 'loginPass') {
+      e.preventDefault();
+      login();
+      return;
+    }
+
+    const modal = modalTerbukaTeratas();
+    if (!modal) return;
+    if (e.key === 'Enter') {
+      if (e.repeat || Date.now() - modalDibukaPada < 500) return;   // cegah Enter ikutan dari scan/ketik sebelumnya
+      if (!MODAL_ENTER_BOLEH.has(modal.id)) return;
+      if (e.target && /^(BUTTON|A|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+      const btn = modal.querySelector('.btn-primary:not([disabled])');
+      if (btn) { e.preventDefault(); btn.click(); }
+    } else if (e.key === 'Escape') {
+      const tutup = MODAL_PENUTUP[modal.id];
+      if (tutup) { e.preventDefault(); tutup(); }
+    }
+  });
+
   // ================= MODAL ANIMATION HELPERS =================
   const MODAL_ANIMATION_DURATION = 300; // matches --duration-normal
+  let modalDibukaPada = 0;
+
+  // Konfirmasi ya/tidak dengan modal aplikasi. Mengembalikan Promise<boolean>.
+  let konfirmUmumResolver = null;
+  function tanyaKonfirmasi(judul, pesan, labelYa) {
+    return new Promise(resolve => {
+      if (konfirmUmumResolver) konfirmUmumResolver(false);
+      konfirmUmumResolver = resolve;
+      document.getElementById('konfirmUmumJudul').textContent = judul;
+      document.getElementById('konfirmUmumPesan').textContent = pesan;
+      document.getElementById('konfirmUmumYa').textContent = labelYa || 'Ya';
+      openModal(document.getElementById('konfirmUmumModal'));
+    });
+  }
+  function jawabKonfirmasiUmum(ya) {
+    const r = konfirmUmumResolver;
+    konfirmUmumResolver = null;
+    closeModal(document.getElementById('konfirmUmumModal'));
+    if (r) r(!!ya);
+  }
 
   function openModal(modalEl) {
     if (!modalEl) return;
     modalEl.style.display = 'flex';
+    modalDibukaPada = Date.now();
     // Force reflow to ensure animation plays
     void modalEl.offsetWidth;
     modalEl.classList.add('modal-enter');
@@ -3716,7 +3792,12 @@
     const pesan = akanNyalakan
       ? 'Yakin ingin mengaktifkan kembali pencocokan verifikator untuk semua cabang?'
       : 'Yakin ingin mematikan pencocokan verifikator untuk semua cabang? Fitur pencocokan kasir & verifikator akan dinonaktifkan.';
-    if (!confirm(pesan)) return;
+    const setuju = await tanyaKonfirmasi(
+      akanNyalakan ? 'Aktifkan Pencocokan?' : 'Matikan Pencocokan?',
+      pesan,
+      akanNyalakan ? 'Ya, Aktifkan' : 'Ya, Matikan'
+    );
+    if (!setuju) return;
     try {
       await api('toggle_verif_set', { aktif: akanNyalakan });
       pencocokanVerifAktif = akanNyalakan;
