@@ -25,6 +25,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <script src="vendor/qrcode.js"></script>
   <script src="vendor/html5-qrcode.min.js"></script>
+  <script>window.APP_DEFAULTS = { API_URL: "https://script.google.com/macros/s/AKfycbzpxd_u_pFIDunZyh50aQRIMBlvdWZ5Ot3VCevsVKTX2kEGRytqOxkFOf6hyX-9Rfh7/exec", POLL_SECONDS: 60 };</script>
   <script src="config.js" onerror="window.__configGagal = true; console.error('config.js gagal dimuat - pastikan config.js ada dan API_URL valid')"></script>
   <style>
     /* ==== Palet: hitam #000000 · abu terang #DFDEDC · abu gelap #464545 · teal #00ACAC · abu sedang #A6A7A2 ====
@@ -1116,9 +1117,8 @@
     /* Prevent body scroll when modal is open */
     body.modal-open {
       overflow: hidden;
-      position: fixed;
-      width: 100%;
     }
+    .modal-overlay { overscroll-behavior: contain; }
 
     /* Better input field spacing in modals */
     .modal-box .form-group,
@@ -2141,11 +2141,7 @@
     setTimeout(() => {
       modalEl.style.display = 'none';
       modalEl.classList.remove('modal-exit');
-      // Only remove modal-open if no other modals are open
-      const openModals = document.querySelectorAll('.modal-overlay[style*="flex"]');
-      if (openModals.length === 0) {
-        document.body.classList.remove('modal-open');
-      }
+      syncModalOpen();
     }, MODAL_ANIMATION_DURATION);
   }
 
@@ -2921,18 +2917,36 @@
 
     try {
       if (!qrScanner) qrScanner = new Html5Qrcode("reader", scannerOptions());
-      await qrScanner.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: (vw, vh) => {
-            const w = Math.floor(Math.min(vw, 360) * 0.85);
-            return { width: w, height: Math.floor(w * 0.55) };
-          }
-        },
-        onScanSuccess,
-        () => {}
-      );
+      // Area pindai hampir seluruh frame: QR yang dipegang dekat di HP tidak terpotong kotak kecil.
+      const scanConfig = {
+        fps: 10,
+        qrbox: (vw, vh) => ({
+          width: Math.max(50, Math.floor(vw * 0.92)),
+          height: Math.max(50, Math.floor(vh * 0.92))
+        })
+      };
+      try {
+        // Minta resolusi lebih tinggi; bawaan HP sering hanya 640x480 sehingga QR buram/sulit terbaca
+        await qrScanner.start(
+          { facingMode: "environment" },
+          Object.assign({}, scanConfig, {
+            videoConstraints: {
+              facingMode: { ideal: "environment" },
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          }),
+          onScanSuccess,
+          () => {}
+        );
+      } catch (errHd) {
+        const nm = (errHd && errHd.name) || '';
+        if (/NotAllowed|NotFound|NotReadable|Security/i.test(nm)) throw errHd;
+        // Kamera menolak batasan resolusi: ulangi dengan pengaturan sederhana
+        await qrScanner.start({ facingMode: "environment" }, scanConfig, onScanSuccess, () => {});
+      }
+      // Fokus otomatis terus-menerus (didukung Chrome Android); diabaikan jika tidak tersedia
+      try { await qrScanner.applyVideoConstraints({ advanced: [{ focusMode: "continuous" }] }); } catch (e) {}
       isScanning = true;
       hapticFeedback('medium');
     } catch (err) {
