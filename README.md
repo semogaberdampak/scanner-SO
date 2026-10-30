@@ -1,41 +1,74 @@
 # System Scan & Stock (PWA)
 
-Aplikasi scan barcode dan input stok per cabang (Kasir & Verifikator).
+Aplikasi scan barcode dan input stok per cabang, dengan tiga peran: **Kasir**, **Verifikator**, dan **Admin**.
 
-- **Frontend**: folder `public/` — HTML/JS statis, di-host di **Cloudflare Pages**
-- **Backend**: folder `apps-script/` — **Google Apps Script** sebagai API JSON, data tersimpan di Google Sheets
+- **Frontend**: HTML/JS statis, di-host di **Cloudflare Pages**
+- **Backend**: **Google Apps Script** sebagai API JSON, data tersimpan di Google Sheets
+
+## Struktur folder
 
 ```
-public/                 -> di-deploy ke Cloudflare Pages (output directory)
-  index.html            tampilan + logika
-  config.js             URL Web App Apps Script (WAJIB diisi)
-  manifest.webmanifest  agar bisa di-install sebagai aplikasi
-  sw.js                 service worker (cache cangkang aplikasi)
-  _headers              header Cloudflare Pages (izin kamera, dll.)
-  icons/  vendor/       ikon & library scanner (html5-qrcode 2.3.8, di-host sendiri)
-apps-script/Code.gs     -> disalin ke editor Apps Script
+index.html              tampilan + logika (satu file)
+config.js               URL Web App Apps Script + interval polling (WAJIB diisi)
+manifest.webmanifest    agar bisa di-install sebagai aplikasi
+sw.js                   service worker (cache cangkang aplikasi)
+_headers                header Cloudflare Pages (izin kamera, CSP, cache)
+icons/                  ikon aplikasi
+vendor/                 library di-host sendiri: html5-qrcode (scanner), qrcode.js (pembuat QR),
+                        exceljs (ekspor rekap .xlsx, dimuat hanya saat diunduh)
+apps-script/Code.gs     -> disalin ke editor Apps Script (tidak ikut dipakai di browser)
 ```
+
+File pengembangan berikut **bukan bagian aplikasi** dan tidak perlu di-deploy:
+`findings.json`, `patch1.txt`, `temp_end_check.txt`, `test-validation.js`, `verify_4.js`.
+(`findings.json` dan `test-validation.js` merujuk versi `Code.gs` yang lebih lama, jadi isinya sudah tidak mewakili kode sekarang.)
+
+> **Saran:** pindahkan file aplikasi (`index.html`, `config.js`, `manifest.webmanifest`, `sw.js`, `_headers`, `icons/`, `vendor/`)
+> ke folder `public/` dan jadikan itu *output directory* di Cloudflare Pages. Dengan begitu `apps-script/` dan file
+> pengembangan di atas tidak ikut terpublikasi.
 
 ## 1. Pasang backend (Apps Script)
 
-1. Buka Google Spreadsheet yang berisi sheet `Master` (kolom: produk_id, isbn, nama_produk, harga).
+1. Buka Google Spreadsheet yang berisi sheet `Master` dengan kolom A–D: `produk_id`, `isbn`, `nama_produk`, `harga`.
 2. **Extensions → Apps Script**. Hapus isi lama, tempel isi `apps-script/Code.gs`, simpan.
-3. (Disarankan) **Project Settings → Script Properties → Add**: nama `APP_PIN`, nilai PIN Anda.
-   Jika tidak diisi, PIN bawaan di kode (`PIN_DEFAULT`) yang dipakai.
+3. **Project Settings → Script Properties → Add** (WAJIB, ketiganya):
+
+   | Nama | Dipakai untuk |
+   |---|---|
+   | `APP_PIN` | PIN **Kasir** (satu PIN untuk semua cabang) |
+   | `APP_PIN_VERIFIKATOR` | PIN **Verifikator** (satu PIN untuk semua cabang) |
+   | `APP_PIN_ADMIN` | PIN **Admin** (Super User) |
+
+   Nilai bawaan di kode (`PIN_DEFAULT`, `PIN_ADMIN_DEFAULT`, `PIN_VERIFIKATOR_DEFAULT`) sengaja kosong.
+   Jika sebuah properti belum diisi, login untuk peran itu ditolak dengan pesan yang menyebut properti mana yang kurang.
 4. **Deploy → New deployment → Web app**
    - Execute as: **Me**
    - Who has access: **Anyone**
 5. Salin **Web app URL** (berakhiran `/exec`). Setiap mengubah `Code.gs`, buat versi baru:
    **Deploy → Manage deployments → Edit → Version: New version → Deploy**.
 
+Sheet per cabang (`kranggan`, `katedral`, `santamaria`, `athanasius`, `antonius`, `paulus`) dan sheet uji `tes_input`
+dibuat otomatis saat pertama dipakai, dengan kolom: `kode_produk`, `nama_produk`, `harga`, `input_kasir`,
+`timestamp_kasir`, `input_verifikator`, `timestamp_verifikator`, `keterangan`, `kategori`.
+Jika sheet dengan nama itu sudah ada dan baris 1-nya bukan format di atas, aplikasi menolak menulis ke sheet tersebut.
+
 ## 2. Isi alamat API
 
-Edit `public/config.js`, ganti `GANTI_DENGAN_URL_WEB_APP_APPS_SCRIPT` dengan URL tadi.
+Edit `config.js`:
+
+```js
+window.APP_CONFIG = {
+  API_URL: "https://script.google.com/macros/s/XXXX/exec",   // URL Web App tadi
+  POLL_SECONDS: 60                                           // lihat bagian Notifikasi
+};
+```
+
+`API_URL` harus diawali `https://script.google.com/`. Jika `config.js` gagal dimuat, aplikasi memakai nilai cadangan
+`window.APP_DEFAULTS` di bagian atas `index.html`; **ubah juga URL di sana** bila Web App di-deploy ulang dengan URL baru.
 
 ## 3. Buat repo GitHub
 
 ```bash
-cd scan-stock-pwa
 git init
 git add .
 git commit -m "Versi awal: Scan & Stock PWA"
@@ -53,68 +86,122 @@ git push -u origin main
 2. Pengaturan build:
    - Framework preset: **None**
    - Build command: *(kosongkan)*
-   - Build output directory: **`public`**
+   - Build output directory: **`public`** jika file aplikasi sudah dipindah ke `public/` (disarankan),
+     atau *(kosongkan / root)* jika struktur tetap datar seperti sekarang
 3. **Save and Deploy**. Hasilnya `https://<nama-proyek>.pages.dev` (HTTPS, jadi kamera bisa dipakai).
 
 Setiap `git push` ke `main` otomatis men-deploy ulang.
 
 ## 5. Uji di HP
 
-1. Buka alamat `.pages.dev` di Chrome → login → **Buka Kamera** → izinkan kamera.
+1. Buka alamat `.pages.dev` di Chrome → pilih cabang & peran → masukkan PIN → **Buka Kamera** → izinkan kamera.
 2. Menu Chrome (⋮) → **Install app / Add to Home screen**.
 
-## Catatan
+## Peran dan login
 
-- Sesi login berlaku maksimal 6 jam, lalu diminta login lagi.
+- Login memilih **cabang** (atau **Super User (Admin)**) lalu **peran** Kasir / Verifikator, dan memasukkan PIN peran tersebut.
+- Sesi berlaku **6 jam sejak aktivitas terakhir** (diperpanjang setiap permintaan ke server), lalu diminta login lagi.
 - Cabang, role, nama, dan harga ditentukan **server** dari sesi dan sheet `Master`, bukan dari browser.
-- Menambah cabang: ubah `CABANG_VALID` di `Code.gs` dan daftar `<option>` di `public/index.html`.
-- Setelah mengubah file di `public/`, naikkan `CACHE = 'scanstock-v2'` di `sw.js` (mis. `v2`) agar HP mengambil versi terbaru.
-- Aplikasi memerlukan internet; belum ada antrean offline.
+- Salah PIN ditunda ±0,8 detik sebelum dijawab.
+- **Menambah cabang**: ubah `CABANG_VALID` di `Code.gs`, lalu tambahkan `<option>` di **dua** tempat pada `index.html`
+  (daftar cabang di form login dan daftar sheet di panel unduh rekap admin).
+
+## Jadwal input per cabang (Admin)
+
+- Admin mengatur tanggal-tanggal yang diizinkan untuk tiap cabang. **Tanpa tanggal = cabang ditutup.**
+- Pada hari yang tidak terdaftar (zona waktu WIB), **simpan stok dan pencocokan ditolak** dengan pesan jadwal berikutnya.
+- Unduh rekap tetap bisa dilakukan kapan saja. Maksimal 400 tanggal per cabang.
+- Sheet uji `tes_input` tidak terkena jadwal.
+
+## Mode uji Admin
+
+- Admin **tidak menyentuh data cabang**. Semua aksi admin diarahkan ke sheet `tes_input`.
+- Admin dapat memilih **peran uji** (Kasir atau Verifikator) untuk menguji alur dua pihak.
+- Ekspor rekap oleh admin juga hanya dari `tes_input`.
 
 ## Notifikasi selisih & pencocokan
 
 - Lonceng di pojok kanan atas (sebelah tombol tema) hanya untuk Kasir dan Verifikator. Badge = jumlah produk yang
   sudah diinput KEDUA peran tetapi nilainya berbeda. Urutan daftar: selisih terlama lebih dulu
   ("sejak" = waktu input terakhir dari kedua peran).
-- Aplikasi mengecek server tiap `POLL_SECONDS` detik (`public/config.js`, bawaan 60, minimum 5), hanya saat tab terlihat.
-- Klik baris -> isi nilai valid -> "Sudah yakin?" -> disimpan. Di sheet cabang: baris awal diwarnai oranye (nilai tidak diubah),
-  satu baris REKONSILIASI hijau disisipkan tepat di bawahnya (kolom H "keterangan" mencatat siapa & nilai awal).
-  Rekap dan notifikasi selalu membaca baris TERAKHIR tiap produk.
-- Input susulan setelah rekonsiliasi dicatat di baris baru berlabel LANJUTAN (baris rekonsiliasi tidak pernah diubah).
-- Setelah mengubah `Code.gs`, selalu buat versi deployment baru (Deploy > Manage deployments > Edit > New version).
-
-## QR Code dengan Perintah "Enter"
-
-- Setiap QR kode yang dihasilkan (tombol tampilkan QR di layar SnD) diakhiri dengan karakter **Carriage Return (`\r`)**.
-- Saat QR tersebut discan oleh scanner barcode (mode keyboard wedge), scanner akan mengetik isi QR lalu menekan **Enter** secara otomatis, sehingga kursor pindah ke kolom/baris berikutnya tanpa perlu menekan tombol secara manual.
-- Contoh isi QR: `ITEM001|5` + `Enter` (dikirim sebagai `ITEM001|5\r`).
-- Perilaku ini bergantung pada konfigurasi scanner handheld. Beberapa scanner mungkin memfilter karakter kontrol; pastikan scanner diatur untuk mengirimkan suffix Enter setelah scan.
+- Aplikasi mengecek server tiap `POLL_SECONDS` detik (`config.js`; bawaan kode 60, minimum 5), hanya saat tab terlihat.
+  Server men-cache hasil hitungan selisih selama 60 detik (cache dihapus otomatis saat ada simpan/pencocokan).
+  Pada `config.js` yang disertakan nilainya masih **10 (untuk uji coba)**; naikkan ke 60 untuk pemakaian harian.
+- **Pencocokan butuh persetujuan dua pihak.** Kasir dan Verifikator masing-masing mengajukan nilai yang valid
+  (klik baris → isi nilai → "Sudah yakin?"):
+  1. Baru satu pihak mengajukan → pengajuan disimpan sementara, **sheet tidak berubah**.
+  2. Kedua pihak mengajukan nilai **sama** → sheet ditulis: baris awal diwarnai oranye (nilai tidak diubah, kolom H
+     ditandai `SELISIH`), satu baris `REKONSILIASI` hijau disisipkan tepat di bawahnya (kolom H mencatat siapa,
+     kapan, nilai awal, dan nilai valid).
+  3. Kedua pihak mengajukan nilai **berbeda** → kedua pengajuan dibatalkan, sheet tidak berubah, ulangi dari awal.
+- Jika nilai produk berubah (ada input baru) saat pengajuan berjalan, pengajuan lama dibatalkan.
+- Rekap, notifikasi, dan Input SnD selalu membaca baris TERAKHIR tiap produk.
+- Input susulan setelah rekonsiliasi dicatat di baris baru berlabel `LANJUTAN` (baris rekonsiliasi tidak pernah diubah).
 
 ## Toggle Pencocokan Verifikator (Admin)
 
-- Hanya role **ADMIN** yang melihat tombol toggle di panel admin (Mode Uji).
+- Hanya role **ADMIN** yang melihat tombol toggle di panel admin. Muncul konfirmasi saat mematikan maupun mengaktifkan.
+- Status **disimpan di server** (Script Property `TOGGLE_VERIFIKATOR`) dan berlaku untuk **semua cabang**.
+  `localStorage` hanya salinan lokal; nilai dari server yang dipakai saat aplikasi dimuat.
+- Badge **Verif: AKTIF / NONAKTIF** tampil untuk semua pengguna.
 - Tombol berubah teks sesuai status:
-  - `Matikan Pencocokan Verifikator` → fitur pencocokan Kasir ↔ Verifikator **AKTIF** (default).
-  - `Aktifkan Pencocokan Verifikator` → fitur pencocokan **MATI**.
+  - `Matikan Pencocokan Verifikator` → pencocokan Kasir ↔ Verifikator **AKTIF** (default).
+  - `Aktifkan Pencocokan Verifikator` → pencocokan **MATI**.
 - Saat MATI:
-  - Modal Pencocokan Selisih (`reconModal`) tidak dapat dibuka.
-  - Lonceng notifikasi selisih disembunyikan.
-  - Aksi simpan pencocokan (`rekonsiliasi`) diblokir di frontend.
-  - Muncul konfirmasi `confirm` saat mematikan maupun saat mengaktifkan kembali.
-- Status tersimpan di `localStorage` sehingga tetap setelah halaman dimuat ulang.
-- **Fitur input SND (scan & stok entry) tetap bekerja normal** baik toggle dalam status ON maupun OFF.
+  - **Login Verifikator ditolak** oleh server dan pilihan peran Verifikator dinonaktifkan di form login.
+  - Modal Pencocokan Selisih tidak dapat dibuka dan lonceng notifikasi disembunyikan.
+  - Aksi pencocokan diblokir di frontend.
+  - Input SnD hanya mensyaratkan Kasir sudah input (tanpa menunggu Verifikator).
+- Fitur input stok Kasir tetap bekerja normal baik toggle ON maupun OFF.
+
+## Modal input produk
+
+- Setelah produk ditemukan (scan kamera, foto, ketik kode, atau pilih dari daftar), muncul **modal di tengah layar**
+  berisi ID, nama, harga, kolom Jumlah (bawaan 1), dan pilihan kategori.
+- Produk berkode alfanumerik 10 karakter (mis. `1123LB0001`) otomatis berkategori Eksternal.
+- **Simpan** menutup modal lalu menampilkan pesan hasil; **Batal** menutup modal dan kamera lanjut memindai.
+- Kamera berhenti sementara selama modal terbuka. Jika jadwal input cabang sedang tutup, tombol Simpan dinonaktifkan.
+
+## Input SnD (khusus Kasir)
+
+- Menampilkan produk per **kode supplier** = karakter ke-5 dan ke-6 kode produk (mis. `1123LB0001` → `LB`). Isi tepat 2 karakter.
+- Hanya produk yang jumlahnya **sudah valid** yang tampil: kedua peran sudah input dan nilainya sama
+  (hasil pencocokan atau memang sama sejak awal). Produk yang belum valid dihitung sebagai "belum".
+  Saat toggle pencocokan MATI, cukup Kasir yang sudah input.
+- Fitur ini hanya membaca, tidak menyimpan apa pun ke sheet.
+
+## QR Code dengan perintah "Enter"
+
+- Tombol tampilkan QR di layar SnD membuat QR berformat `KODE` atau `KODE|JUMLAH`, diakhiri karakter
+  **Carriage Return (`\r`)**.
+- Saat QR discan scanner barcode (mode keyboard wedge), scanner mengetik isi QR lalu menekan **Enter** otomatis,
+  sehingga kursor pindah ke kolom/baris berikutnya. Contoh isi: `ITEM001|5` + Enter (dikirim sebagai `ITEM001|5\r`).
+- Perilaku ini bergantung pada konfigurasi scanner handheld. Beberapa scanner memfilter karakter kontrol;
+  pastikan scanner diatur mengirim suffix Enter setelah scan.
 
 ## Pencarian produk (ketik)
 
-- Tidak peka huruf besar/kecil (`1123lb0001` = `1123LB0001`).
-- Urutan: kode persis (produk_id atau ISBN) -> kode yang BERAKHIRAN dengan yang diketik (`23lb0001`, `lb0001`)
-  -> kode yang memuat yang diketik. Minimal 3 karakter untuk pencarian sebagian.
+- Tidak peka huruf besar/kecil (`1123lb0001` = `1123LB0001`). Spasi dan tanda minus diabaikan.
+- Urutan: kode persis (produk_id atau ISBN) → kode yang BERAKHIRAN dengan yang diketik (`23lb0001`, `lb0001`)
+  → kode yang memuat yang diketik. **Minimal 3 karakter** untuk pencarian sebagian.
 - Jika cocok dengan lebih dari satu produk, muncul daftar pilihan (maksimal 50 baris, bagian yang diketik disorot).
 - Scanner kamera/foto tetap memakai kode persis (tidak sebagian), supaya hasil scan tidak salah produk.
+
+## Rekap (unduh Excel)
+
+- Setiap peran dapat mengunduh rekap perbandingan Kasir vs Verifikator untuk cabangnya (admin: `tes_input`) sebagai `.xlsx`.
+- Pustaka `exceljs` dimuat hanya saat tombol unduh dipakai. Filter tanggal belum didukung backend (semua data ditampilkan).
 
 ## Warna
 
 Palet: `#000000`, `#DFDEDC`, `#464545`, `#00ACAC` (teal), `#A6A7A2`. Semua warna ada di blok `:root` (terang) dan
-`[data-theme="dark"]` (gelap) di `public/index.html`. Teal dipakai sebagai latar tombol dengan teks hitam; untuk teks/garis
+`[data-theme="dark"]` (gelap) di `index.html`. Teal dipakai sebagai latar tombol dengan teks hitam; untuk teks/garis
 di mode terang dipakai `--accent-text` (teal lebih gelap) agar kontras minimal 4.5:1. Warna merah (selisih/peringatan)
 sengaja di luar palet karena bermakna peringatan.
+
+## Catatan
+
+- Setelah mengubah file aplikasi (`index.html`, dll.), naikkan nomor `CACHE` di `sw.js` (saat ini `scanstock-v12`,
+  jadi berikutnya `v13`) agar HP mengambil versi terbaru.
+- Setelah mengubah `Code.gs`, selalu buat versi deployment baru (Deploy > Manage deployments > Edit > New version).
+- Aplikasi memerlukan internet; belum ada antrean offline.

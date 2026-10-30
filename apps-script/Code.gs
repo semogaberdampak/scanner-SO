@@ -220,6 +220,7 @@ function login_(b) {
   // Admin: PIN admin tersendiri
   if (cabang === 'admin') {
     var benarAdmin = String(props.getProperty('APP_PIN_ADMIN') || PIN_ADMIN_DEFAULT);
+    if (!benarAdmin) return { ok: false, error: 'PIN Admin belum diatur di Script Properties (APP_PIN_ADMIN).' };
     if (pin !== benarAdmin) { Utilities.sleep(800); return { ok: false, error: 'PIN salah.' }; };
     var user = { username: 'admin', role: 'ADMIN', cabang: 'admin' };
     var token = Utilities.getUuid() + Utilities.getUuid();
@@ -238,6 +239,7 @@ function login_(b) {
       return { ok: false, error: 'Login Verifikator sementara dinonaktifkan oleh admin (mode verifikator OFF).' };
     }
     var benarVerif = String(props.getProperty('APP_PIN_VERIFIKATOR') || PIN_VERIFIKATOR_DEFAULT);
+    if (!benarVerif) return { ok: false, error: 'PIN Verifikator belum diatur di Script Properties (APP_PIN_VERIFIKATOR).' };
     if (pin !== benarVerif) { Utilities.sleep(800); return { ok: false, error: 'PIN Verifikator salah.' }; }
     // Verifikator login sukses
     var user = { username: 'verifikator_' + cabang, role: 'VERIFIKATOR', cabang: cabang };
@@ -247,6 +249,7 @@ function login_(b) {
   } else {
     // Kasir pakai PIN cabang biasa
     var benarKasir = String(props.getProperty('APP_PIN') || PIN_DEFAULT);
+    if (!benarKasir) return { ok: false, error: 'PIN Kasir belum diatur di Script Properties (APP_PIN).' };
     if (pin !== benarKasir) { Utilities.sleep(800); return { ok: false, error: 'PIN salah.' }; }
     // Kasir login sukses
     var user = { username: 'kasir_' + cabang, role: 'KASIR', cabang: cabang };
