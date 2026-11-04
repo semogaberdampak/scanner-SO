@@ -199,6 +199,7 @@ function doPost(e) {
       case 'jadwal_set': return json_(jadwalSet_(requireSession_(body), body));
       case 'toggle_verif_get': return json_(toggleVerifGet_(requireSession_(body)));
       case 'toggle_verif_set': return json_(toggleVerifSet_(requireSession_(body), body));
+      case 'tambah_produk':     return json_(tambahProduk_(efektif_(requireSession_(body), body), body));
       case 'snd_centang_get':   return json_(sndCentangGet_(efektif_(requireSession_(body), body)));
       case 'snd_centang_set':   return json_(sndCentangSet_(efektif_(requireSession_(body), body), body));
       case 'snd_centang_reset': return json_(sndCentangReset_(efektif_(requireSession_(body), body)));
@@ -295,6 +296,79 @@ function master_(user) {
     }
   }
   return { ok: true, data: out };
+}
+
+// ===== TAMBAH PRODUK MANUAL (produk tidak ada di Master) =====
+// Menulis satu baris baru di akhir sheet Master: produk_id | isbn (kosong) | nama_produk | harga.
+// Kolom tambahan di sebelah kanan (dibuat otomatis jika belum ada): kategori, ditambah_oleh, waktu_ditambah.
+var KATEGORI_VALID = ['KANISIUS', 'NON_KANISIUS', 'EKSTERNAL'];
+
+function kolomMaster_(sheet, nama) {
+  var lastCol = Math.max(sheet.getLastColumn(), 4);
+  var head = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  for (var i = 4; i < head.length; i++) {
+    if (String(head[i]).trim().toLowerCase() === nama) return i + 1;
+  }
+  var col = lastCol + 1;
+  sheet.getRange(1, col).setValue(nama);
+  return col;
+}
+
+function cariDiMaster_(master, kode) {
+  var kolom = ['A:A', 'B:B'];                                  // produk_id atau ISBN
+  for (var i = 0; i < kolom.length; i++) {
+    var f = master.getRange(kolom[i]).createTextFinder(kode).matchEntireCell(true).findNext();
+    if (f) return f.getRow();
+  }
+  return 0;
+}
+
+function tambahProduk_(user, b) {
+  if (user.role !== 'KASIR' && user.role !== 'VERIFIKATOR')
+    return { ok: false, error: 'Pilih peran uji (Kasir atau Verifikator) terlebih dulu.' };
+  var tutup = wajibTerbuka_(user);          // mengikuti jadwal input cabang (admin/tes_input dikecualikan)
+  if (tutup) return tutup;
+
+  var kode = String(b.produk_id == null ? '' : b.produk_id).trim().toUpperCase();
+  var nama = String(b.nama_produk == null ? '' : b.nama_produk).replace(/\s+/g, ' ').trim();
+  var harga = Number(b.harga);
+  var kategori = String(b.kategori || '').trim().toUpperCase();
+
+  if (!/^[A-Z0-9]{3,30}$/.test(kode)) return { ok: false, error: 'Kode produk harus 3-30 huruf/angka, tanpa spasi atau tanda baca.' };
+  if (nama.length < 2 || nama.length > 120) return { ok: false, error: 'Nama produk harus 2-120 karakter.' };
+  if (!isFinite(harga) || harga < 0 || harga > 1000000000 || Math.floor(harga) !== harga)
+    return { ok: false, error: 'Harga harus berupa angka bulat (Rupiah), 0 sampai 1.000.000.000.' };
+  if (KATEGORI_VALID.indexOf(kategori) < 0) return { ok: false, error: 'Pilih kategori produk.' };
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var master = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Master');
+    if (!master) return { ok: false, error: 'Sheet Master tidak ditemukan.' };
+
+    // Sudah ada (mis. baru ditambahkan perangkat lain): jangan duplikat, pakai data yang ada
+    var ada = cariDiMaster_(master, kode);
+    if (ada) {
+      var m = master.getRange(ada, 1, 1, 4).getValues()[0];
+      return { ok: true, sudah_ada: true, kategori: kategori,
+               produk: { produk_id: String(m[0]).trim(), isbn: String(m[1] || '').trim(), nama_produk: m[2], harga: m[3] } };
+    }
+
+    var kolKat = kolomMaster_(master, 'kategori');
+    var kolOleh = kolomMaster_(master, 'ditambah_oleh');
+    var kolWkt = kolomMaster_(master, 'waktu_ditambah');
+    var baris = master.getLastRow() + 1;
+    master.getRange(baris, 1).setNumberFormat('@');           // kode sebagai teks (angka 0 di depan tidak hilang)
+    master.getRange(baris, 1, 1, 4).setValues([[kode, '', nama, harga]]);
+    master.getRange(baris, kolKat).setValue(kategori);
+    master.getRange(baris, kolOleh).setValue(user.username + ' / ' + user.cabang);
+    master.getRange(baris, kolWkt).setValue(new Date());
+    master.getRange(baris, kolWkt).setNumberFormat(FORMAT_WAKTU);
+    return { ok: true, sudah_ada: false, kategori: kategori,
+             produk: { produk_id: kode, isbn: '', nama_produk: nama, harga: harga } };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function simpan_(user, b) {

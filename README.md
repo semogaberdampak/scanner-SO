@@ -154,6 +154,24 @@ Setiap `git push` ke `main` otomatis men-deploy ulang.
   - Input SnD hanya mensyaratkan Kasir sudah input (tanpa menunggu Verifikator).
 - Fitur input stok Kasir tetap bekerja normal baik toggle ON maupun OFF.
 
+## Tambah produk manual (produk tidak ada di database)
+
+- Jika scan atau pencarian ketik tidak menemukan produk, langsung muncul **pop-up "Produk Tidak Ditemukan"** di tengah
+  layar (tidak perlu scroll halaman); **Batal** menutupnya. Setelah Batal, scanner mengabaikan kode yang sama selama
+  ±4 detik agar pop-up tidak muncul berulang. Formulirnya berisi **Kode produk** (kode yang dicari terisi otomatis), **Nama produk**,
+  **Harga**, dan dropdown **Kategori** (Buku Kanisius, Buku Non Kanisius, Eksternal; kode alfanumerik 10 karakter
+  otomatis Eksternal).
+- Saat **Simpan**, server menulis satu baris baru di akhir sheet **Master**: `produk_id`, `isbn` (kosong), `nama_produk`,
+  `harga`. Tiga kolom tambahan dibuat otomatis di sebelah kanan jika belum ada: `kategori`, `ditambah_oleh`
+  (pengguna / cabang), `waktu_ditambah`. Produk lama di Master tidak diubah.
+- Validasi (server): kode 3-30 huruf/angka tanpa spasi atau tanda baca (disimpan huruf besar), nama 2-120 karakter, harga
+  bilangan bulat 0 sampai 1.000.000.000, kategori wajib. Kode yang sudah ada di Master (kolom `produk_id` atau `isbn`)
+  tidak diduplikasi; data yang ada dipakai.
+- Setelah tersimpan, produk langsung bisa dicari dan di-scan, lalu modal input jumlah terbuka dengan kategori sudah terpilih;
+  kategori itu ikut tercatat di sheet cabang saat jumlah disimpan.
+- Hanya Kasir dan Verifikator (admin lewat peran uji), mengikuti jadwal input cabang. Perlu internet (tidak masuk antrean offline).
+  Baris yang ditambah admin tercatat `admin / tes_input` di kolom `ditambah_oleh`, sehingga mudah disaring dan dihapus.
+
 ## Modal input produk
 
 - Setelah produk ditemukan (scan kamera, foto, ketik kode, atau pilih dari daftar), muncul **modal di tengah layar**

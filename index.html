@@ -1686,6 +1686,11 @@
       header.top-bar::after { animation: none; }
       .ts-thumb, .ts-ic, .ts-track::before, .ts-track::after { transition-duration: 1ms !important; }
     }
+
+    /* Pop-up tambah produk: lebih lebar, label rata kiri, isi bisa digulir di dalam modal (tinggi mengikuti layar) */
+    #tambahProdukModal .modal-box { max-width: 360px; max-height: 90vh; max-height: 90dvh; text-align: left; }
+    #tambahProdukModal .modal-title, #tambahProdukModal .panel-sub { text-align: center; }
+    #tambahProdukModal .recon-label { display: block; text-align: left; margin-top: var(--space-2); }
   </style>
 </head>
 <body>
@@ -1962,6 +1967,39 @@
 </div>
 
 <!-- Jadwal input per cabang (admin) -->
+<!-- Tambah produk manual (produk tidak ada di Master) -->
+<div class="modal-overlay" id="tambahProdukModal" role="dialog" aria-modal="true" aria-labelledby="tambahProdukJudul">
+  <div class="modal-box">
+    <div class="modal-title" id="tambahProdukJudul" style="margin-bottom: 4px;">Produk Tidak Ditemukan</div>
+    <div class="panel-sub" id="tpSub">Produk belum ada di database. Isi data berikut untuk menambahkannya ke sheet Master.</div>
+
+    <label class="recon-label" for="tpKode">Kode produk</label>
+    <input type="text" id="tpKode" class="recon-field" maxlength="30" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="next" placeholder="mis. 1117JR0074">
+
+    <label class="recon-label" for="tpNama">Nama produk</label>
+    <input type="text" id="tpNama" class="recon-field" maxlength="120" autocomplete="off" enterkeyhint="next" placeholder="Nama produk">
+
+    <label class="recon-label" for="tpHarga">Harga (Rp)</label>
+    <input type="text" id="tpHarga" class="recon-field" inputmode="numeric" autocomplete="off" enterkeyhint="next" placeholder="0"
+           oninput="formatHargaInput(this)">
+
+    <label class="recon-label" for="tpKategori">Kategori</label>
+    <select id="tpKategori" class="recon-field">
+      <option value="">Pilih kategori…</option>
+      <option value="KANISIUS">Buku Kanisius</option>
+      <option value="NON_KANISIUS">Buku Non Kanisius</option>
+      <option value="EKSTERNAL">Eksternal</option>
+    </select>
+
+    <div class="panel-sub" id="tpPesan" role="alert" style="color: var(--alert); min-height: 1.2em;"></div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="tutupTambahProduk()">Batal</button>
+      <button class="btn btn-primary" id="btnTpSimpan" onclick="simpanProdukBaru()">Simpan</button>
+    </div>
+  </div>
+</div>
+
 <!-- Ekspor rekap -->
 <div class="modal-overlay" id="rekapModal" role="dialog" aria-modal="true" aria-labelledby="rekapJudul">
   <div class="modal-box">
@@ -2389,6 +2427,7 @@
     sndMetodeModal: () => tutupSndMetode(),
     jadwalModal: () => tutupJadwal(),
     rekapModal: () => tutupRekap(),
+    tambahProdukModal: () => tutupTambahProduk(),
     pilihModal: () => tutupPilihProduk(),
     konfirmUmumModal: () => jawabKonfirmasiUmum(false)
   };
@@ -2860,23 +2899,103 @@
     }
   }
 
+  let kodeTidakDitemukan = '';
+  let tolakKode = '', tolakSampai = 0;     // setelah Batal, scanner tidak langsung memunculkan kode yang sama lagi
+
+  // Produk tidak ditemukan: langsung tampil pop-up (tidak perlu scroll ke kartu di bawah halaman)
   function produkTidakDitemukan(kode) {
-    const card = document.getElementById('resultCard');
     activeItem = null;
-    document.getElementById('resId').innerText = "Kode dicari: " + kode;
-    document.getElementById('resTitle').innerText = "Produk Tidak Ditemukan";
-    document.getElementById('resPrice').innerText = "Rp 0";
-    card.className = "card result-card error";
-    card.style.display = "block";
+    kodeTidakDitemukan = String(kode || '');
+    document.getElementById('resultCard').style.display = 'none';
     hapticFeedback('error');
+    bukaTambahProduk();
   }
 
   // Kode persis (produk_id atau ISBN), tanpa peduli huruf besar/kecil. Dipakai oleh scanner kamera & foto.
+  function normalisasiKodeScan(k) { return String(k).trim().replace(/[- ]/g, '').toUpperCase(); }
+
   function lookupProduct(scannedCode) {
     if (!scannedCode) return;
+    if (document.getElementById('tambahProdukModal').style.display === 'flex') return;   // sedang mengisi formulir tambah produk
+    if (Date.now() < tolakSampai && normalisasiKodeScan(scannedCode) === tolakKode) return; // baru dibatalkan: abaikan kode yang sama sesaat
     const key = String(scannedCode).trim().replace(/[- ]/g, '').toUpperCase();
     const item = productLookupMap[key];
     if (item) tampilkanProduk(item); else produkTidakDitemukan(scannedCode);
+  }
+
+  // ================= TAMBAH PRODUK MANUAL =================
+  // Format harga saat mengetik: 1250000 -> 1.250.000
+  function formatHargaInput(el) {
+    const angka = el.value.replace(/\D/g, '').slice(0, 10);
+    el.value = angka ? Number(angka).toLocaleString('id-ID') : '';
+  }
+
+  function bukaTambahProduk() {
+    const kode = kodeTidakDitemukan.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 30);
+    document.getElementById('tpKode').value = kode;
+    document.getElementById('tpNama').value = '';
+    document.getElementById('tpHarga').value = '';
+    document.getElementById('tpPesan').textContent = '';
+    // Kode alfanumerik 10 karakter (mis. 1117JR0074) = Eksternal; selain itu user memilih sendiri
+    document.getElementById('tpKategori').value = (kode.length === 10 && jenisKode(kode) === 'ALFANUMERIK') ? 'EKSTERNAL' : '';
+    const asli = kodeTidakDitemukan.trim();
+    document.getElementById('tpSub').textContent = asli
+      ? `Kode “${asli}” belum ada di database. Isi data berikut untuk menambahkannya ke sheet Master.`
+      : 'Produk belum ada di database. Isi data berikut untuk menambahkannya ke sheet Master.';
+    document.getElementById('btnTpSimpan').disabled = !aksesTerbuka;
+    openModal(document.getElementById('tambahProdukModal'));
+    // Di HP jangan langsung memunculkan keyboard (menutupi formulir); di PC fokus ke kolom pertama yang kosong
+    if (!window.matchMedia('(pointer: coarse)').matches) {
+      setTimeout(() => document.getElementById(kode ? 'tpNama' : 'tpKode').focus(), MODAL_ANIMATION_DURATION);
+    }
+  }
+
+  function tutupTambahProduk() {
+    tolakKode = normalisasiKodeScan(kodeTidakDitemukan);
+    tolakSampai = Date.now() + 4000;
+    closeModal(document.getElementById('tambahProdukModal'));
+  }
+
+  async function simpanProdukBaru() {
+    const pesan = document.getElementById('tpPesan');
+    const kode = document.getElementById('tpKode').value.trim().toUpperCase();
+    const nama = document.getElementById('tpNama').value.replace(/\s+/g, ' ').trim();
+    const harga = parseInt(document.getElementById('tpHarga').value.replace(/\D/g, ''), 10);
+    const kategori = document.getElementById('tpKategori').value;
+
+    if (!/^[A-Z0-9]{3,30}$/.test(kode)) return pesan.textContent = 'Kode produk harus 3-30 huruf/angka, tanpa spasi atau tanda baca.';
+    if (nama.length < 2) return pesan.textContent = 'Nama produk wajib diisi.';
+    if (isNaN(harga)) return pesan.textContent = 'Harga wajib diisi.';
+    if (!kategori) return pesan.textContent = 'Pilih kategori produk.';
+    pesan.textContent = '';
+
+    const btn = document.getElementById('btnTpSimpan');
+    btn.disabled = true; btn.innerText = 'Menyimpan...';
+    try {
+      const res = await api('tambah_produk', { produk_id: kode, nama_produk: nama, harga: harga, kategori: kategori });
+      const item = res.produk;
+      const idU = String(item.produk_id).trim().toUpperCase();
+      if (!productLookupMap[idU]) {                           // tambahkan ke data di layar agar langsung bisa dicari/discan
+        productLookupMap[idU] = item;
+        productList.push({ idU: idU, item: item });
+        const status = document.getElementById('dbStatus');
+        if (status) status.innerText = '✅ Database Siap (' + productList.length + ' Produk Loaded)';
+      }
+      tutupTambahProduk();
+      document.getElementById('resultCard').style.display = 'none';
+      // Lanjut ke input jumlah untuk produk ini, kategori sudah terpilih
+      tampilkanProduk(productLookupMap[idU]);
+      tandaiKategoriProdukModal(res.kategori || kategori);
+      document.getElementById('produkModalId').innerText += res.sudah_ada ? ' · sudah ada di Master' : ' · baru ditambahkan';
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      pesan.textContent = err.code === 'NETWORK'
+        ? 'Tidak ada koneksi. Menambah produk baru membutuhkan internet.'
+        : err.message;
+      hapticFeedback('error');
+    } finally {
+      btn.disabled = !aksesTerbuka; btn.innerText = 'Simpan';
+    }
   }
 
   async function simpanInputQty() {
@@ -3366,7 +3485,7 @@
     notif = { count: 0, items: [], menunggu: 0, updated: null };
     notifSeen = false;
     reconItem = null;
-    ['notifPanel', 'reconModal', 'confirmModal', 'pilihModal', 'jadwalModal', 'rekapModal', 'konfirmUmumModal', 'sndModal', 'qrModal'].forEach(id => document.getElementById(id).style.display = 'none');
+    ['notifPanel', 'reconModal', 'confirmModal', 'pilihModal', 'jadwalModal', 'rekapModal', 'tambahProdukModal', 'konfirmUmumModal', 'sndModal', 'qrModal'].forEach(id => document.getElementById(id).style.display = 'none');
     const bell = document.getElementById('btnBell');
     bell.style.display = 'none';
     bell.classList.remove('has-alert', 'ring');
