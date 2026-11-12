@@ -1,0 +1,16 @@
+{
+  "name": "scanner-so-mock-server",
+  "version": "1.0.0",
+  "description": "Mock server for scanner-SO Google Apps Script API",
+  "main": "mock-server.js",
+  "scripts": {
+    "start": "node mock-server.js",
+    "dev": "node mock-server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "exceljs": "^4.4.0",
+    "uuid": "^9.0.0"
+  }
+}

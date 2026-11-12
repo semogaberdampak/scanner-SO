@@ -1,0 +1,64 @@
+{
+  "data": [
+    {
+      "produk_id": "1123LB0001",
+      "isbn": "978602000001",
+      "nama_produk": "Buku Kanisius SD Kelas 1",
+      "harga": 85000
+    },
+    {
+      "produk_id": "1123LB0002",
+      "isbn": "978602000002",
+      "nama_produk": "Buku Kanisius SD Kelas 2",
+      "harga": 90000
+    },
+    {
+      "produk_id": "1123LB0003",
+      "isbn": "978602000003",
+      "nama_produk": "Buku Kanisius SD Kelas 3",
+      "harga": 95000
+    },
+    {
+      "produk_id": "1123NK0001",
+      "isbn": "978602100001",
+      "nama_produk": "Novel Non Kanisius A",
+      "harga": 120000
+    },
+    {
+      "produk_id": "1123NK0002",
+      "isbn": "978602100002",
+      "nama_produk": "Novel Non Kanisius B",
+      "harga": 135000
+    },
+    {
+      "produk_id": "1123EK0001",
+      "isbn": "978602200001",
+      "nama_produk": "Buku Eksternal Matematika",
+      "harga": 75000
+    },
+    {
+      "produk_id": "1123EK0002",
+      "isbn": "978602200002",
+      "nama_produk": "Buku Eksternal IPA",
+      "harga": 80000
+    },
+    {
+      "produk_id": "1123LB0004",
+      "isbn": "978602000004",
+      "nama_produk": "Buku Kanisius SD Kelas 4",
+      "harga": 100000
+    },
+    {
+      "produk_id": "1123LB0005",
+      "isbn": "978602000005",
+      "nama_produk": "Buku Kanisius SD Kelas 5",
+      "harga": 105000
+    },
+    {
+      "produk_id": "1123LB0006",
+      "isbn": "978602000006",
+      "nama_produk": "Buku Kanisius SD Kelas 6",
+      "harga": 110000
+    }
+  ]
+}

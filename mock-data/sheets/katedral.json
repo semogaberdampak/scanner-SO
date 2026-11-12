@@ -1,0 +1,15 @@
+{
+  "rows": [
+    [
+      "kode_produk",
+      "nama_produk",
+      "harga",
+      "input_kasir",
+      "timestamp_kasir",
+      "input_verifikator",
+      "timestamp_verifikator",
+      "keterangan",
+      "kategori"
+    ]
+  ]
+}

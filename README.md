@@ -2,16 +2,16 @@
 
 Aplikasi scan barcode dan input stok per cabang (Kasir & Verifikator).
 
-- **Frontend**: folder `public/` — HTML/JS statis, di-host di **Cloudflare Pages**
+- **Frontend**: folder `public/` — HTML/JS statis, di-host di **Vercel**
 - **Backend**: folder `apps-script/` — **Google Apps Script** sebagai API JSON, data tersimpan di Google Sheets
 
 ```
-public/                 -> di-deploy ke Cloudflare Pages (output directory)
+public/                 -> di-deploy ke Vercel (output directory)
   index.html            tampilan + logika
   config.js             URL Web App Apps Script (WAJIB diisi)
   manifest.webmanifest  agar bisa di-install sebagai aplikasi
   sw.js                 service worker (cache cangkang aplikasi)
-  _headers              header Cloudflare Pages (izin kamera, dll.)
+  vercel.json           header Vercel (izin kamera, dll.)
   icons/  vendor/       ikon & library scanner (html5-qrcode 2.3.8, di-host sendiri)
 apps-script/Code.gs     -> disalin ke editor Apps Script
 ```
@@ -46,21 +46,20 @@ git push -u origin main
 
 (Buat repo kosong dulu di github.com → New repository, tanpa README/.gitignore bawaan.)
 
-## 4. Deploy ke Cloudflare Pages
+## 4. Deploy ke Vercel
 
-1. Dashboard Cloudflare → **Workers & Pages → Create → Pages → Connect to Git**, pilih repo tadi.
-   (Nama menu bisa sedikit berbeda tergantung versi dashboard.)
+1. Dashboard Vercel → **Add New → Project**, pilih repo tadi.
 2. Pengaturan build:
-   - Framework preset: **None**
+   - Framework preset: **Other**
    - Build command: *(kosongkan)*
-   - Build output directory: **`public`**
-3. **Save and Deploy**. Hasilnya `https://<nama-proyek>.pages.dev` (HTTPS, jadi kamera bisa dipakai).
+   - Output directory: **`public`**
+3. **Deploy**. Hasilnya `https://<nama-proyek>.vercel.app` (HTTPS, jadi kamera bisa dipakai).
 
 Setiap `git push` ke `main` otomatis men-deploy ulang.
 
 ## 5. Uji di HP
 
-1. Buka alamat `.pages.dev` di Chrome → login → **Buka Kamera** → izinkan kamera.
+1. Buka alamat `.vercel.app` di Chrome → login → **Buka Kamera** → izinkan kamera.
 2. Menu Chrome (⋮) → **Install app / Add to Home screen**.
 
 ## Catatan

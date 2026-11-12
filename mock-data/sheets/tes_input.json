@@ -1,0 +1,26 @@
+{
+  "rows": [
+    [
+      "kode_produk",
+      "nama_produk",
+      "harga",
+      "input_kasir",
+      "timestamp_kasir",
+      "input_verifikator",
+      "timestamp_verifikator",
+      "keterangan",
+      "kategori"
+    ],
+    [
+      "1123LB0001",
+      "Buku Kanisius SD Kelas 1",
+      85000,
+      5,
+      "2026-10-28T04:09:34.897Z",
+      5,
+      "2026-10-28T04:10:02.654Z",
+      "",
+      "KANISIUS"
+    ]
+  ]
+}

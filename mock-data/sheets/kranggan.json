@@ -1,0 +1,37 @@
+{
+  "rows": [
+    [
+      "kode_produk",
+      "nama_produk",
+      "harga",
+      "input_kasir",
+      "timestamp_kasir",
+      "input_verifikator",
+      "timestamp_verifikator",
+      "keterangan",
+      "kategori"
+    ],
+    [
+      "1123LB0001",
+      "Buku Kanisius SD Kelas 1",
+      85000,
+      10,
+      "2026-10-28T04:00:58.090Z",
+      8,
+      "2026-10-28T04:03:07.288Z",
+      "SELISIH (diganti baris rekonsiliasi di bawahnya)",
+      "KANISIUS"
+    ],
+    [
+      "1123LB0001",
+      "Buku Kanisius SD Kelas 1",
+      85000,
+      8,
+      "2026-10-28T04:05:24.396Z",
+      8,
+      "2026-10-28T04:05:24.396Z",
+      "REKONSILIASI | disepakati kasir (kasir_kranggan, 28/10 11:05) & verifikator (verifikator_kranggan, 28/10 11:05) | awal: kasir 10, verifikator 8 | nilai valid 8",
+      "KANISIUS"
+    ]
+  ]
+}
