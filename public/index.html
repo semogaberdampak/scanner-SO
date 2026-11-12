@@ -2900,6 +2900,7 @@
   }
 
   let kodeTidakDitemukan = '';
+  let kodeMentahScan = '';                 // teks asli hasil scan (untuk keterangan diagnosis di pop-up tambah produk)
   let tolakKode = '', tolakSampai = 0;     // setelah Batal, scanner tidak langsung memunculkan kode yang sama lagi
 
   // Produk tidak ditemukan: langsung tampil pop-up (tidak perlu scroll ke kartu di bawah halaman)
@@ -2916,7 +2917,8 @@
 
   // Hasil scan bisa membawa karakter kontrol (Enter) atau format QR SnD "KODE|JUMLAH": ambil kodenya saja
   function bersihkanHasilScan(teks) {
-    let s = String(teks).replace(/[\r\n\t\0]/g, ' ').trim();
+    // Karakter kontrol (Enter, STX/ETX, dll.) dan karakter tak terlihat (zero-width, BOM) dijadikan spasi
+    let s = String(teks).replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF]/g, ' ').trim();
     if (s.includes('|')) s = s.split('|')[0].trim();
     return s;
   }
@@ -2925,12 +2927,19 @@
   // minimal 3 karakter). Jika cocok dengan banyak produk, tampil daftar pilihan (tidak pernah memilih otomatis).
   function lookupProduct(scannedCode) {
     if (!scannedCode) return;
-    const bersih = bersihkanHasilScan(scannedCode);
+    const mentah = String(scannedCode);
+    let bersih = bersihkanHasilScan(mentah);
+    if (!productLookupMap[normalisasiKodeScan(bersih)]) {
+      // Tidak persis cocok: buang tanda baca di sekitar kode (mis. *013448* pada Code 39, atau [013448]) lalu cari sebagian
+      const alnum = bersih.replace(/[^A-Za-z0-9]/g, '');
+      if (alnum) bersih = alnum;
+    }
     const key = normalisasiKodeScan(bersih);
     if (!key) return;
     if (document.getElementById('tambahProdukModal').style.display === 'flex') return;   // sedang mengisi formulir tambah produk
     if (document.getElementById('pilihModal').style.display === 'flex') return;          // sedang memilih dari daftar hasil
     if (Date.now() < tolakSampai && key === tolakKode) return;                           // baru dibatalkan: abaikan kode yang sama sesaat
+    kodeMentahScan = mentah;
     cariFleksibel(bersih, true);
   }
 
@@ -2950,9 +2959,15 @@
     // Kode alfanumerik 10 karakter (mis. 1117JR0074) = Eksternal; selain itu user memilih sendiri
     document.getElementById('tpKategori').value = (kode.length === 10 && jenisKode(kode) === 'ALFANUMERIK') ? 'EKSTERNAL' : '';
     const asli = kodeTidakDitemukan.trim();
-    document.getElementById('tpSub').textContent = asli
+    let sub = asli
       ? `Kode “${asli}” belum ada di database. Isi data berikut untuk menambahkannya ke sheet Master.`
       : 'Produk belum ada di database. Isi data berikut untuk menambahkannya ke sheet Master.';
+    if (kodeMentahScan) {
+      // Tampilkan hasil scan apa adanya (karakter tak terlihat ditulis \uXXXX) untuk memudahkan melacak scan yang gagal
+      const tampil = kodeMentahScan.replace(/[^\x20-\x7E]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+      sub += ` Hasil scan mentah: ${tampil} (${kodeMentahScan.length} karakter).`;
+    }
+    document.getElementById('tpSub').textContent = sub;
     document.getElementById('btnTpSimpan').disabled = !aksesTerbuka;
     openModal(document.getElementById('tambahProdukModal'));
     // Di HP jangan langsung memunculkan keyboard (menutupi formulir); di PC fokus ke kolom pertama yang kosong
@@ -3214,6 +3229,7 @@
 
   // 1) kode persis  2) kode berakhiran yang diketik (23lb0001, lb0001)  3) kode memuat yang diketik
   function cariFleksibel(raw, dariScan) {
+    if (!dariScan) kodeMentahScan = '';
     const key = raw.replace(/[\s-]/g, '').toUpperCase();
     const persis = productLookupMap[key];
     if (persis) return tampilkanProduk(persis);

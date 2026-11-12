@@ -2900,6 +2900,7 @@
   }
 
   let kodeTidakDitemukan = '';
+  let kodeMentahScan = '';                 // teks asli hasil scan (untuk keterangan diagnosis di pop-up tambah produk)
   let tolakKode = '', tolakSampai = 0;     // setelah Batal, scanner tidak langsung memunculkan kode yang sama lagi
 
   // Produk tidak ditemukan: langsung tampil pop-up (tidak perlu scroll ke kartu di bawah halaman)
@@ -2912,15 +2913,34 @@
   }
 
   // Kode persis (produk_id atau ISBN), tanpa peduli huruf besar/kecil. Dipakai oleh scanner kamera & foto.
-  function normalisasiKodeScan(k) { return String(k).trim().replace(/[- ]/g, '').toUpperCase(); }
+  function normalisasiKodeScan(k) { return String(k).trim().replace(/[\s-]/g, '').toUpperCase(); }
 
+  // Hasil scan bisa membawa karakter kontrol (Enter) atau format QR SnD "KODE|JUMLAH": ambil kodenya saja
+  function bersihkanHasilScan(teks) {
+    // Karakter kontrol (Enter, STX/ETX, dll.) dan karakter tak terlihat (zero-width, BOM) dijadikan spasi
+    let s = String(teks).replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF]/g, ' ').trim();
+    if (s.includes('|')) s = s.split('|')[0].trim();
+    return s;
+  }
+
+  // Hasil scan (kamera/foto) diperlakukan seperti ketik manual: kode persis, atau sebagian (akhiran / bagian mana pun,
+  // minimal 3 karakter). Jika cocok dengan banyak produk, tampil daftar pilihan (tidak pernah memilih otomatis).
   function lookupProduct(scannedCode) {
     if (!scannedCode) return;
+    const mentah = String(scannedCode);
+    let bersih = bersihkanHasilScan(mentah);
+    if (!productLookupMap[normalisasiKodeScan(bersih)]) {
+      // Tidak persis cocok: buang tanda baca di sekitar kode (mis. *013448* pada Code 39, atau [013448]) lalu cari sebagian
+      const alnum = bersih.replace(/[^A-Za-z0-9]/g, '');
+      if (alnum) bersih = alnum;
+    }
+    const key = normalisasiKodeScan(bersih);
+    if (!key) return;
     if (document.getElementById('tambahProdukModal').style.display === 'flex') return;   // sedang mengisi formulir tambah produk
-    if (Date.now() < tolakSampai && normalisasiKodeScan(scannedCode) === tolakKode) return; // baru dibatalkan: abaikan kode yang sama sesaat
-    const key = String(scannedCode).trim().replace(/[- ]/g, '').toUpperCase();
-    const item = productLookupMap[key];
-    if (item) tampilkanProduk(item); else produkTidakDitemukan(scannedCode);
+    if (document.getElementById('pilihModal').style.display === 'flex') return;          // sedang memilih dari daftar hasil
+    if (Date.now() < tolakSampai && key === tolakKode) return;                           // baru dibatalkan: abaikan kode yang sama sesaat
+    kodeMentahScan = mentah;
+    cariFleksibel(bersih, true);
   }
 
   // ================= TAMBAH PRODUK MANUAL =================
@@ -2939,9 +2959,15 @@
     // Kode alfanumerik 10 karakter (mis. 1117JR0074) = Eksternal; selain itu user memilih sendiri
     document.getElementById('tpKategori').value = (kode.length === 10 && jenisKode(kode) === 'ALFANUMERIK') ? 'EKSTERNAL' : '';
     const asli = kodeTidakDitemukan.trim();
-    document.getElementById('tpSub').textContent = asli
+    let sub = asli
       ? `Kode “${asli}” belum ada di database. Isi data berikut untuk menambahkannya ke sheet Master.`
       : 'Produk belum ada di database. Isi data berikut untuk menambahkannya ke sheet Master.';
+    if (kodeMentahScan) {
+      // Tampilkan hasil scan apa adanya (karakter tak terlihat ditulis \uXXXX) untuk memudahkan melacak scan yang gagal
+      const tampil = kodeMentahScan.replace(/[^\x20-\x7E]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+      sub += ` Hasil scan mentah: ${tampil} (${kodeMentahScan.length} karakter).`;
+    }
+    document.getElementById('tpSub').textContent = sub;
     document.getElementById('btnTpSimpan').disabled = !aksesTerbuka;
     openModal(document.getElementById('tambahProdukModal'));
     // Di HP jangan langsung memunculkan keyboard (menutupi formulir); di PC fokus ke kolom pertama yang kosong
@@ -3202,13 +3228,18 @@
   }
 
   // 1) kode persis  2) kode berakhiran yang diketik (23lb0001, lb0001)  3) kode memuat yang diketik
-  function cariFleksibel(raw) {
+  function cariFleksibel(raw, dariScan) {
+    if (!dariScan) kodeMentahScan = '';
     const key = raw.replace(/[\s-]/g, '').toUpperCase();
     const persis = productLookupMap[key];
     if (persis) return tampilkanProduk(persis);
 
-    if (key.length < MIN_KODE_SEBAGIAN)
-      return showModal("Kode Terlalu Pendek", `Ketik minimal ${MIN_KODE_SEBAGIAN} karakter terakhir dari kode produk, atau scan barcode-nya.`);
+    if (key.length < MIN_KODE_SEBAGIAN) {
+      if (dariScan) { tolakKode = key; tolakSampai = Date.now() + 4000; }   // jangan ulang terus selama QR masih di depan kamera
+      return showModal("Kode Terlalu Pendek", dariScan
+        ? `Hasil scan “${raw}” hanya ${key.length} karakter. Minimal ${MIN_KODE_SEBAGIAN} karakter agar bisa dicocokkan sebagian.`
+        : `Ketik minimal ${MIN_KODE_SEBAGIAN} karakter terakhir dari kode produk, atau scan barcode-nya.`);
+    }
 
     let hasil = productList.filter(p => p.idU.endsWith(key));
     let mode = 'akhir';
@@ -3220,10 +3251,13 @@
     if (hasil.length === 1) return tampilkanProduk(hasil[0].item);
 
     hasil.sort((x, y) => (x.idU < y.idU ? -1 : x.idU > y.idU ? 1 : 0));
-    bukaPilihProduk(raw, key, hasil, mode);
+    bukaPilihProduk(raw, key, hasil, mode, dariScan);
   }
 
-  function bukaPilihProduk(raw, key, hasil, mode) {
+  let pilihDariScanKey = '';
+
+  function bukaPilihProduk(raw, key, hasil, mode, dariScan) {
+    pilihDariScanKey = dariScan ? key : '';
     const list = document.getElementById('pilihList');
     list.textContent = '';
     list.classList.add('stagger-list'); // Add staggered animation
@@ -3257,7 +3291,11 @@
     openModal(document.getElementById('pilihModal'));
   }
 
-  function tutupPilihProduk() { closeModal(document.getElementById('pilihModal')); }
+  function tutupPilihProduk() {
+    // Daftar hasil scan ditutup: abaikan kode yang sama sesaat supaya daftar tidak terbuka lagi dari QR yang sama
+    if (pilihDariScanKey) { tolakKode = pilihDariScanKey; tolakSampai = Date.now() + 4000; pilihDariScanKey = ''; }
+    closeModal(document.getElementById('pilihModal'));
+  }
 
   // ================= KAMERA / SCANNER =================
   let qrScanner = null;
