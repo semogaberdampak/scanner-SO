@@ -10,7 +10,7 @@
   # style-src: 'self' 'unsafe-inline' for inline styles
   # connect-src: 'self' https://script.google.com for API calls
   # img-src: 'self' data: blob: for QR codes and exports
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://script.google.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://script.google.com; img-src 'self' data: blob:; font-src 'self'; manifest-src 'self';
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://script.google.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://script.google.com https://script.googleusercontent.com; img-src 'self' data: blob:; font-src 'self'; manifest-src 'self';
 
 /sw.js
   Cache-Control: no-cache, no-store, must-revalidate

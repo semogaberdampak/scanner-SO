@@ -37,6 +37,9 @@ var NOTIF_CACHE_DETIK = 60;
 var SHEET_UJI = 'tes_input';        // sheet khusus uji coba admin (semua fitur, tanpa jadwal)
 var TZ_AKSES = 'Asia/Jakarta';     // "hari ini" untuk jadwal input mengikuti WIB
 var MAKS_TANGGAL = 400;            // batas jumlah tanggal per cabang
+var SHEET_CENTANG = 'snd_centang';  // tanda centang Input SnD, disimpan per cabang agar tidak hilang antar hari/perangkat
+var HEADER_CENTANG = ['cabang', 'kode_produk', 'waktu', 'oleh'];
+var MAKS_CENTANG_SEKALI = 200;     // batas kode per permintaan simpan
 
 // true = judul sudah ada; false = sheet kosong (judul akan dibuat); lempar error jika isinya format lain
 function cekFormatSheet_(sheet) {
@@ -196,6 +199,10 @@ function doPost(e) {
       case 'jadwal_set': return json_(jadwalSet_(requireSession_(body), body));
       case 'toggle_verif_get': return json_(toggleVerifGet_(requireSession_(body)));
       case 'toggle_verif_set': return json_(toggleVerifSet_(requireSession_(body), body));
+      case 'tambah_produk':     return json_(tambahProduk_(efektif_(requireSession_(body), body), body));
+      case 'snd_centang_get':   return json_(sndCentangGet_(efektif_(requireSession_(body), body)));
+      case 'snd_centang_set':   return json_(sndCentangSet_(efektif_(requireSession_(body), body), body));
+      case 'snd_centang_reset': return json_(sndCentangReset_(efektif_(requireSession_(body), body)));
 
       default:       return json_({ ok: false, error: 'Aksi tidak dikenal.' });
     }
@@ -220,6 +227,7 @@ function login_(b) {
   // Admin: PIN admin tersendiri
   if (cabang === 'admin') {
     var benarAdmin = String(props.getProperty('APP_PIN_ADMIN') || PIN_ADMIN_DEFAULT);
+    if (!benarAdmin) return { ok: false, error: 'PIN Admin belum diatur di Script Properties (APP_PIN_ADMIN).' };
     if (pin !== benarAdmin) { Utilities.sleep(800); return { ok: false, error: 'PIN salah.' }; };
     var user = { username: 'admin', role: 'ADMIN', cabang: 'admin' };
     var token = Utilities.getUuid() + Utilities.getUuid();
@@ -238,6 +246,7 @@ function login_(b) {
       return { ok: false, error: 'Login Verifikator sementara dinonaktifkan oleh admin (mode verifikator OFF).' };
     }
     var benarVerif = String(props.getProperty('APP_PIN_VERIFIKATOR') || PIN_VERIFIKATOR_DEFAULT);
+    if (!benarVerif) return { ok: false, error: 'PIN Verifikator belum diatur di Script Properties (APP_PIN_VERIFIKATOR).' };
     if (pin !== benarVerif) { Utilities.sleep(800); return { ok: false, error: 'PIN Verifikator salah.' }; }
     // Verifikator login sukses
     var user = { username: 'verifikator_' + cabang, role: 'VERIFIKATOR', cabang: cabang };
@@ -247,6 +256,7 @@ function login_(b) {
   } else {
     // Kasir pakai PIN cabang biasa
     var benarKasir = String(props.getProperty('APP_PIN') || PIN_DEFAULT);
+    if (!benarKasir) return { ok: false, error: 'PIN Kasir belum diatur di Script Properties (APP_PIN).' };
     if (pin !== benarKasir) { Utilities.sleep(800); return { ok: false, error: 'PIN salah.' }; }
     // Kasir login sukses
     var user = { username: 'kasir_' + cabang, role: 'KASIR', cabang: cabang };
@@ -286,6 +296,79 @@ function master_(user) {
     }
   }
   return { ok: true, data: out };
+}
+
+// ===== TAMBAH PRODUK MANUAL (produk tidak ada di Master) =====
+// Menulis satu baris baru di akhir sheet Master: produk_id | isbn (kosong) | nama_produk | harga.
+// Kolom tambahan di sebelah kanan (dibuat otomatis jika belum ada): kategori, ditambah_oleh, waktu_ditambah.
+var KATEGORI_VALID = ['KANISIUS', 'NON_KANISIUS', 'EKSTERNAL'];
+
+function kolomMaster_(sheet, nama) {
+  var lastCol = Math.max(sheet.getLastColumn(), 4);
+  var head = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  for (var i = 4; i < head.length; i++) {
+    if (String(head[i]).trim().toLowerCase() === nama) return i + 1;
+  }
+  var col = lastCol + 1;
+  sheet.getRange(1, col).setValue(nama);
+  return col;
+}
+
+function cariDiMaster_(master, kode) {
+  var kolom = ['A:A', 'B:B'];                                  // produk_id atau ISBN
+  for (var i = 0; i < kolom.length; i++) {
+    var f = master.getRange(kolom[i]).createTextFinder(kode).matchEntireCell(true).findNext();
+    if (f) return f.getRow();
+  }
+  return 0;
+}
+
+function tambahProduk_(user, b) {
+  if (user.role !== 'KASIR' && user.role !== 'VERIFIKATOR')
+    return { ok: false, error: 'Pilih peran uji (Kasir atau Verifikator) terlebih dulu.' };
+  var tutup = wajibTerbuka_(user);          // mengikuti jadwal input cabang (admin/tes_input dikecualikan)
+  if (tutup) return tutup;
+
+  var kode = String(b.produk_id == null ? '' : b.produk_id).trim().toUpperCase();
+  var nama = String(b.nama_produk == null ? '' : b.nama_produk).replace(/\s+/g, ' ').trim();
+  var harga = Number(b.harga);
+  var kategori = String(b.kategori || '').trim().toUpperCase();
+
+  if (!/^[A-Z0-9]{3,30}$/.test(kode)) return { ok: false, error: 'Kode produk harus 3-30 huruf/angka, tanpa spasi atau tanda baca.' };
+  if (nama.length < 2 || nama.length > 120) return { ok: false, error: 'Nama produk harus 2-120 karakter.' };
+  if (!isFinite(harga) || harga < 0 || harga > 1000000000 || Math.floor(harga) !== harga)
+    return { ok: false, error: 'Harga harus berupa angka bulat (Rupiah), 0 sampai 1.000.000.000.' };
+  if (KATEGORI_VALID.indexOf(kategori) < 0) return { ok: false, error: 'Pilih kategori produk.' };
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var master = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Master');
+    if (!master) return { ok: false, error: 'Sheet Master tidak ditemukan.' };
+
+    // Sudah ada (mis. baru ditambahkan perangkat lain): jangan duplikat, pakai data yang ada
+    var ada = cariDiMaster_(master, kode);
+    if (ada) {
+      var m = master.getRange(ada, 1, 1, 4).getValues()[0];
+      return { ok: true, sudah_ada: true, kategori: kategori,
+               produk: { produk_id: String(m[0]).trim(), isbn: String(m[1] || '').trim(), nama_produk: m[2], harga: m[3] } };
+    }
+
+    var kolKat = kolomMaster_(master, 'kategori');
+    var kolOleh = kolomMaster_(master, 'ditambah_oleh');
+    var kolWkt = kolomMaster_(master, 'waktu_ditambah');
+    var baris = master.getLastRow() + 1;
+    master.getRange(baris, 1).setNumberFormat('@');           // kode sebagai teks (angka 0 di depan tidak hilang)
+    master.getRange(baris, 1, 1, 4).setValues([[kode, '', nama, harga]]);
+    master.getRange(baris, kolKat).setValue(kategori);
+    master.getRange(baris, kolOleh).setValue(user.username + ' / ' + user.cabang);
+    master.getRange(baris, kolWkt).setValue(new Date());
+    master.getRange(baris, kolWkt).setNumberFormat(FORMAT_WAKTU);
+    return { ok: true, sudah_ada: false, kategori: kategori,
+             produk: { produk_id: kode, isbn: '', nama_produk: nama, harga: harga } };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function simpan_(user, b) {
@@ -364,21 +447,53 @@ function barisAktifSemua_(rows) {
   return { urutan: urutan, aktif: aktif };
 }
 
+// Tanggal (WIB, yyyy-MM-dd) dan teks waktu dari sel timestamp
+function tglWib_(v) { var t = waktu_(v); return t ? Utilities.formatDate(new Date(t), TZ_AKSES, 'yyyy-MM-dd') : ''; }
+function teksWaktu_(v) { var t = waktu_(v); return t ? Utilities.formatDate(new Date(t), TZ_AKSES, FORMAT_WAKTU) : ''; }
+
+// Rekap satu baris per produk (nilai terakhir). Filter tanggal opsional b.dari / b.sampai (yyyy-MM-dd, inklusif)
+// memakai tanggal input TERAKHIR produk itu (yang lebih baru antara waktu kasir dan waktu verifikator).
+// Admin (mode uji) boleh memilih sheet cabang atau tes_input (hanya baca); peran lain hanya cabangnya sendiri.
 function rekap_(user, b) {
-  // Admin: HANYA sheet tes_input. Selain admin: hanya cabangnya sendiri (boleh diunduh kapan saja).
-  var target = user.uji ? SHEET_UJI : user.cabang;
+  b = b || {};
+  var target = user.cabang;
+  if (user.uji) {
+    var pilih = String(b.cabang || '').trim().toLowerCase();
+    target = (pilih === SHEET_UJI || CABANG_VALID.indexOf(pilih) >= 0) ? pilih : SHEET_UJI;
+  }
   if (target !== SHEET_UJI && CABANG_VALID.indexOf(target) < 0) return { ok: false, error: 'Cabang tidak valid.' };
 
+  var dari = b.dari ? String(b.dari) : '', sampai = b.sampai ? String(b.sampai) : '';
+  if (dari && !tanggalValid_(dari)) return { ok: false, error: 'Tanggal "Dari" tidak valid.' };
+  if (sampai && !tanggalValid_(sampai)) return { ok: false, error: 'Tanggal "Sampai" tidak valid.' };
+  if (dari && sampai && dari > sampai) return { ok: false, error: 'Tanggal "Dari" tidak boleh setelah "Sampai".' };
+  var disaring = !!(dari || sampai);
+
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(target);
-  if (!sheet || !cekFormatSheet_(sheet)) return { ok: true, data: [], cabang: target };
+  if (!sheet || !cekFormatSheet_(sheet)) return { ok: true, data: [], cabang: target, disaring: disaring };
 
   // Satu baris per produk: baris terakhir (nilai setelah rekonsiliasi). Baris riwayat tidak ikut dihitung.
   var p = barisAktifSemua_(sheet.getDataRange().getValues());
-  var out = p.urutan.map(function (kode) {
+  var out = [];
+  p.urutan.forEach(function (kode) {
     var r = p.aktif[kode];
-    return { produk_id: kode, nama_produk: r[1], harga: r[2], qty_kasir: Number(r[3]) || 0, qty_verifikator: Number(r[5]) || 0, kategori: String(r[8] || "").trim() };
+    var tk = tglWib_(r[4]), tv = tglWib_(r[6]);
+    var terakhir = tk > tv ? tk : tv;
+    if (disaring) {
+      if (!terakhir) return;                       // belum punya waktu input: tidak bisa ditempatkan pada rentang
+      if (dari && terakhir < dari) return;
+      if (sampai && terakhir > sampai) return;
+    }
+    out.push({
+      produk_id: kode, nama_produk: r[1], harga: r[2],
+      qty_kasir: Number(r[3]) || 0, qty_verifikator: Number(r[5]) || 0,
+      kategori: String(r[8] || '').trim(),
+      tanggal: terakhir,
+      waktu_kasir: teksWaktu_(r[4]), waktu_verifikator: teksWaktu_(r[6]),
+      keterangan: String(r[7] || '').trim()
+    });
   });
-  return { ok: true, data: out, cabang: target };
+  return { ok: true, data: out, cabang: target, disaring: disaring };
 }
 
 // ===== INPUT SnD: filter produk per supplier (HANYA BACA, tidak menyimpan apa pun) =====
@@ -415,6 +530,98 @@ function snd_(user, b) {
   });
   items.sort(function (a, b) { return a.produk_id < b.produk_id ? -1 : a.produk_id > b.produk_id ? 1 : 0; });
   return { ok: true, kode2: kode2, items: items, belum: belum, total_pcs: total };
+}
+
+// ===== TANDA CENTANG INPUT SnD =====
+// Satu sheet "snd_centang" berisi: cabang | kode_produk | waktu | oleh. Admin (mode uji) memakai cabang "tes_input".
+// Menghapus baris di sheet ini = menghapus centang produk tersebut.
+function sheetCentang_(ss) {
+  var sheet = ss.getSheetByName(SHEET_CENTANG);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_CENTANG);
+  }
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(HEADER_CENTANG);
+    sheet.setFrozenRows(1);
+    // Kolom kode produk sebagai teks agar angka 0 di depan tidak hilang
+    sheet.getRange(1, 2, sheet.getMaxRows(), 1).setNumberFormat('@');
+  } else if (String(sheet.getRange(1, 1).getValue()).trim().toLowerCase() !== HEADER_CENTANG[0]) {
+    throw new Error('Format sheet "' + SHEET_CENTANG + '" tidak sesuai. Baris 1 harus berisi judul: ' + HEADER_CENTANG.join(', ') + '.');
+  }
+  return sheet;
+}
+
+function sndCentangWajibKasir_(user) {
+  if (user.role !== 'KASIR') return { ok: false, error: 'Fitur Input SnD hanya untuk Kasir.' };
+  return null;
+}
+
+function sndCentangGet_(user) {
+  var salah = sndCentangWajibKasir_(user); if (salah) return salah;
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CENTANG);
+  if (!sheet || sheet.getLastRow() < 2) return { ok: true, kode: [] };
+  var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+  var kode = [];
+  rows.forEach(function (r) {
+    if (String(r[0]).trim() === user.cabang) kode.push(String(r[1]).trim());
+  });
+  return { ok: true, kode: kode };
+}
+
+function sndCentangSet_(user, b) {
+  var salah = sndCentangWajibKasir_(user); if (salah) return salah;
+  var daftar = Array.isArray(b.kode_list) ? b.kode_list : [b.kode];
+  var bersih = [], lihat = {};
+  daftar.forEach(function (k) {
+    k = String(k == null ? '' : k).trim();
+    if (/^[A-Za-z0-9._-]{1,30}$/.test(k) && !lihat[k]) { lihat[k] = true; bersih.push(k); }
+  });
+  if (!bersih.length) return { ok: false, error: 'Kode produk tidak valid.' };
+  if (bersih.length > MAKS_CENTANG_SEKALI) return { ok: false, error: 'Terlalu banyak kode dalam satu permintaan.' };
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sheet = sheetCentang_(SpreadsheetApp.getActiveSpreadsheet());
+    var sudah = {};
+    if (sheet.getLastRow() >= 2) {
+      sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues().forEach(function (r) {
+        if (String(r[0]).trim() === user.cabang) sudah[String(r[1]).trim()] = true;
+      });
+    }
+    var waktuSkrg = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), FORMAT_WAKTU);
+    var baru = [];
+    bersih.forEach(function (k) {
+      if (!sudah[k]) baru.push([user.cabang, k, waktuSkrg, user.username]);
+    });
+    if (baru.length) {
+      sheet.getRange(sheet.getLastRow() + 1, 1, baru.length, 4).setValues(baru);
+    }
+    return { ok: true, ditambah: baru.length };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function sndCentangReset_(user) {
+  var salah = sndCentangWajibKasir_(user); if (salah) return salah;
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CENTANG);
+    if (!sheet || sheet.getLastRow() < 2) return { ok: true, dihapus: 0 };
+    var n = sheet.getLastRow() - 1;
+    var rows = sheet.getRange(2, 1, n, 4).getValues();
+    var sisa = rows.filter(function (r) { return String(r[0]).trim() !== user.cabang; });
+    var dihapus = rows.length - sisa.length;
+    if (dihapus > 0) {
+      sheet.getRange(2, 1, n, 4).clearContent();
+      if (sisa.length) sheet.getRange(2, 1, sisa.length, 4).setValues(sisa);
+    }
+    return { ok: true, dihapus: dihapus };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ===== NOTIFIKASI SELISIH =====
