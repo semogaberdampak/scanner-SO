@@ -10,14 +10,14 @@ metadata:
 **Lokasi:** D:\_Nitip\awud\scanner-SO
 
 ## Arsitektur
-- **Frontend** (`public/`): HTML/JS statis, di-host di **Vercel**
+- **Frontend** (`public/`): HTML/JS statis, di-host di **Netlify**
 - **Backend** (`apps-script/`): **Google Apps Script** sebagai API JSON, data di Google Sheets
 
 ## Fitur Utama
 - Scan barcode (kamera/HP) + input stok per cabang
 - Dua role: **Kasir** & **Verifikator** (pencocokan data antar role)
 - Role **Admin** punya toggle "Mode Uji" (matikan/aktifkan pencocokan verifikator)
-- PWA: installable, service worker, HTTPS via Vercel
+- PWA: installable, service worker, HTTPS via Netlify
 - Sesi login max 6 jam
 
 ## Konfigurasi Penting

@@ -8,7 +8,7 @@
  * Script ini HARUS dibuat dari dalam Google Spreadsheet (Extensions > Apps Script)
  * karena memakai SpreadsheetApp.getActiveSpreadsheet().
  *
- * Frontend (Vercel) memanggil dengan POST, Content-Type: text/plain
+ * Frontend (Netlify) memanggil dengan POST, Content-Type: text/plain
  * (supaya tidak memicu preflight CORS, yang tidak didukung Apps Script).
  */
 

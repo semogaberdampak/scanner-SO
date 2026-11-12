@@ -275,6 +275,6 @@ apps-script/
 
 1. **Deploy Apps Script** → dapatkan Web App URL
 2. **Update `public/config.js`** dengan URL production
-3. **Deploy ke Vercel** (build output: `public`)
-4. **Test di HP via HTTPS** (`.vercel.app`) untuk kamera
+3. **Deploy ke Netlify** (publish directory: `public`)
+4. **Test di HP via HTTPS** (`.netlify.app`) untuk kamera
 5. **Test flow lengkap**: Login → Scan → Simpan → Notif → Rekon → Rekap → Export

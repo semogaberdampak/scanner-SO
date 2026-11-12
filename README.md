@@ -2,16 +2,16 @@
 
 Aplikasi scan barcode dan input stok per cabang, dengan tiga peran: **Kasir**, **Verifikator**, dan **Admin**.
 
-- **Frontend**: folder `public/` — HTML/JS statis, di-host di **Vercel**
+- **Frontend**: folder `public/` — HTML/JS statis, di-host di **Netlify**
 - **Backend**: folder `apps-script/` — **Google Apps Script** sebagai API JSON, data tersimpan di Google Sheets
 
 ```
-public/                 -> di-deploy ke Vercel (output directory)
+public/                 -> di-deploy ke Netlify (output directory)
   index.html            tampilan + logika
   config.js             URL Web App Apps Script (WAJIB diisi)
   manifest.webmanifest  agar bisa di-install sebagai aplikasi
   sw.js                 service worker (cache cangkang aplikasi)
-  vercel.json           header Vercel (izin kamera, dll.)
+  _headers              header Netlify (izin kamera, dll.)
   icons/  vendor/       ikon & library scanner (html5-qrcode 2.3.8, di-host sendiri)
 apps-script/Code.gs     -> disalin ke editor Apps Script
 ```
@@ -21,7 +21,7 @@ File pengembangan berikut **bukan bagian aplikasi** dan tidak perlu di-deploy:
 (`findings.json` dan `test-validation.js` merujuk versi `Code.gs` yang lebih lama, jadi isinya sudah tidak mewakili kode sekarang.)
 
 > **Saran:** pindahkan file aplikasi (`index.html`, `config.js`, `manifest.webmanifest`, `sw.js`, `_headers`, `icons/`, `vendor/`)
-> ke folder `public/` dan jadikan itu *output directory* di Cloudflare Pages. Dengan begitu `apps-script/` dan file
+> ke folder `public/` dan jadikan itu *publish directory* di Netlify. Dengan begitu `apps-script/` dan file
 > pengembangan di atas tidak ikut terpublikasi.
 
 ## 1. Pasang backend (Apps Script)
@@ -76,20 +76,19 @@ git push -u origin main
 
 (Buat repo kosong dulu di github.com → New repository, tanpa README/.gitignore bawaan.)
 
-## 4. Deploy ke Vercel
+## 4. Deploy ke Netlify
 
-1. Dashboard Vercel → **Add New → Project**, pilih repo tadi.
+1. Dashboard Netlify → **Add new site → Import an existing project**, pilih repo tadi.
 2. Pengaturan build:
-   - Framework preset: **Other**
    - Build command: *(kosongkan)*
-   - Output directory: **`public`**
-3. **Deploy**. Hasilnya `https://<nama-proyek>.vercel.app` (HTTPS, jadi kamera bisa dipakai).
+   - Publish directory: **`public`**
+3. **Deploy site**. Hasilnya `https://<nama-proyek>.netlify.app` (HTTPS, jadi kamera bisa dipakai).
 
 Setiap `git push` ke `main` otomatis men-deploy ulang.
 
 ## 5. Uji di HP
 
-1. Buka alamat `.vercel.app` di Chrome → login → **Buka Kamera** → izinkan kamera.
+1. Buka alamat `.netlify.app` di Chrome → login → **Buka Kamera** → izinkan kamera.
 2. Menu Chrome (⋮) → **Install app / Add to Home screen**.
 
 ## Peran dan login
