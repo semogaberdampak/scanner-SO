@@ -2912,15 +2912,26 @@
   }
 
   // Kode persis (produk_id atau ISBN), tanpa peduli huruf besar/kecil. Dipakai oleh scanner kamera & foto.
-  function normalisasiKodeScan(k) { return String(k).trim().replace(/[- ]/g, '').toUpperCase(); }
+  function normalisasiKodeScan(k) { return String(k).trim().replace(/[\s-]/g, '').toUpperCase(); }
 
+  // Hasil scan bisa membawa karakter kontrol (Enter) atau format QR SnD "KODE|JUMLAH": ambil kodenya saja
+  function bersihkanHasilScan(teks) {
+    let s = String(teks).replace(/[\r\n\t\0]/g, ' ').trim();
+    if (s.includes('|')) s = s.split('|')[0].trim();
+    return s;
+  }
+
+  // Hasil scan (kamera/foto) diperlakukan seperti ketik manual: kode persis, atau sebagian (akhiran / bagian mana pun,
+  // minimal 3 karakter). Jika cocok dengan banyak produk, tampil daftar pilihan (tidak pernah memilih otomatis).
   function lookupProduct(scannedCode) {
     if (!scannedCode) return;
+    const bersih = bersihkanHasilScan(scannedCode);
+    const key = normalisasiKodeScan(bersih);
+    if (!key) return;
     if (document.getElementById('tambahProdukModal').style.display === 'flex') return;   // sedang mengisi formulir tambah produk
-    if (Date.now() < tolakSampai && normalisasiKodeScan(scannedCode) === tolakKode) return; // baru dibatalkan: abaikan kode yang sama sesaat
-    const key = String(scannedCode).trim().replace(/[- ]/g, '').toUpperCase();
-    const item = productLookupMap[key];
-    if (item) tampilkanProduk(item); else produkTidakDitemukan(scannedCode);
+    if (document.getElementById('pilihModal').style.display === 'flex') return;          // sedang memilih dari daftar hasil
+    if (Date.now() < tolakSampai && key === tolakKode) return;                           // baru dibatalkan: abaikan kode yang sama sesaat
+    cariFleksibel(bersih, true);
   }
 
   // ================= TAMBAH PRODUK MANUAL =================
@@ -3202,13 +3213,17 @@
   }
 
   // 1) kode persis  2) kode berakhiran yang diketik (23lb0001, lb0001)  3) kode memuat yang diketik
-  function cariFleksibel(raw) {
+  function cariFleksibel(raw, dariScan) {
     const key = raw.replace(/[\s-]/g, '').toUpperCase();
     const persis = productLookupMap[key];
     if (persis) return tampilkanProduk(persis);
 
-    if (key.length < MIN_KODE_SEBAGIAN)
-      return showModal("Kode Terlalu Pendek", `Ketik minimal ${MIN_KODE_SEBAGIAN} karakter terakhir dari kode produk, atau scan barcode-nya.`);
+    if (key.length < MIN_KODE_SEBAGIAN) {
+      if (dariScan) { tolakKode = key; tolakSampai = Date.now() + 4000; }   // jangan ulang terus selama QR masih di depan kamera
+      return showModal("Kode Terlalu Pendek", dariScan
+        ? `Hasil scan “${raw}” hanya ${key.length} karakter. Minimal ${MIN_KODE_SEBAGIAN} karakter agar bisa dicocokkan sebagian.`
+        : `Ketik minimal ${MIN_KODE_SEBAGIAN} karakter terakhir dari kode produk, atau scan barcode-nya.`);
+    }
 
     let hasil = productList.filter(p => p.idU.endsWith(key));
     let mode = 'akhir';
@@ -3220,10 +3235,13 @@
     if (hasil.length === 1) return tampilkanProduk(hasil[0].item);
 
     hasil.sort((x, y) => (x.idU < y.idU ? -1 : x.idU > y.idU ? 1 : 0));
-    bukaPilihProduk(raw, key, hasil, mode);
+    bukaPilihProduk(raw, key, hasil, mode, dariScan);
   }
 
-  function bukaPilihProduk(raw, key, hasil, mode) {
+  let pilihDariScanKey = '';
+
+  function bukaPilihProduk(raw, key, hasil, mode, dariScan) {
+    pilihDariScanKey = dariScan ? key : '';
     const list = document.getElementById('pilihList');
     list.textContent = '';
     list.classList.add('stagger-list'); // Add staggered animation
@@ -3257,7 +3275,11 @@
     openModal(document.getElementById('pilihModal'));
   }
 
-  function tutupPilihProduk() { closeModal(document.getElementById('pilihModal')); }
+  function tutupPilihProduk() {
+    // Daftar hasil scan ditutup: abaikan kode yang sama sesaat supaya daftar tidak terbuka lagi dari QR yang sama
+    if (pilihDariScanKey) { tolakKode = pilihDariScanKey; tolakSampai = Date.now() + 4000; pilihDariScanKey = ''; }
+    closeModal(document.getElementById('pilihModal'));
+  }
 
   // ================= KAMERA / SCANNER =================
   let qrScanner = null;
