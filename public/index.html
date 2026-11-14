@@ -972,6 +972,40 @@
       padding: var(--space-2);
     }
 
+    /* ===== Pemicu kamera & modal kamera ===== */
+    .camera-launcher {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      padding: var(--space-4);
+    }
+    .camera-launcher-title { font-size: var(--text-base); font-weight: var(--font-weight-bold); color: var(--text-main); }
+    .camera-launcher-sub { margin-top: var(--space-1); font-size: var(--text-xs); line-height: 1.4; color: var(--text-muted); }
+
+    /* Di bawah produkModal (2000): form input muncul di atas pratinjau kamera */
+    #scannerModal { z-index: 1990; }
+    #scannerModal .camera-modal-box { max-width: 92vw; width: min(92vw, 520px); padding: var(--space-3); text-align: left; }
+    .scanner-modal-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-2); }
+    .scanner-modal-head .modal-title { margin-bottom: 0; }
+    #scannerModal .scanner-area { margin-bottom: 0; }
+    .scanner-modal-foot { margin-top: var(--space-2); }
+    /* Tombol tutup di dalam modal, bukan melayang di atas video */
+    #scannerModal .scanner-modal-foot #btnStopScanner { position: static; width: 100%; box-shadow: none; }
+    .scanner-status {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: var(--space-4);
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: #FFFFFF;
+      background: rgba(0, 0, 0, 0.62);
+      z-index: 25;
+    }
+
     /* Manual Input Area */
     .manual-input-area { margin-top: var(--space-2); }
     .photo-input { display: flex; align-items: center; justify-content: center; gap: var(--space-2); }
@@ -1818,27 +1852,20 @@
       <!-- Akses Bar (Kasir/Verifikator) -->
       <div class="akses-bar card animate-height" id="aksesBar" role="status" aria-live="polite"></div>
 
-      <!-- Scanner Area - Full Bleed -->
-      <div class="scanner-area" id="scannerArea">
-        <div class="scanner-preview" id="reader"></div>
-        <div class="scan-frame" id="scanFrame" aria-hidden="true">
-          <div class="scan-frame-corner tl"></div>
-          <div class="scan-frame-corner tr"></div>
-          <div class="scan-frame-corner bl"></div>
-          <div class="scan-frame-corner br"></div>
-          <div class="scan-line" id="scanLine"></div>
+      <!-- Pemicu kamera. Tidak ada kotak hitam di halaman: kamera hanya tampil
+           di modal tersendiri (tengah layar) selama kamera benar-benar aktif. -->
+      <div class="card camera-launcher" id="cameraLauncher">
+        <div class="camera-launcher-text">
+          <div class="camera-launcher-title">Scan Barcode / QR</div>
+          <div class="camera-launcher-sub">Kamera dibuka di jendela tengah layar. Kamera dimatikan otomatis selama data disimpan, lalu dinyalakan lagi setelah selesai.</div>
         </div>
-        <div class="scanner-controls">
-          <button class="btn btn-primary btn-lg" id="btnStartScanner" onclick="startScanner()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-              <circle cx="12" cy="13" r="4"></circle>
-            </svg>
-            <span>Buka Kamera</span>
-          </button>
-          <button class="btn btn-secondary btn-lg" id="btnStopScanner" onclick="stopScanner()" style="display: none;" aria-label="Tutup kamera">✕ Tutup</button>
-        </div>
-        <div class="scanner-hint" id="scannerHint">Ketuk tombol di atas untuk memulai scanner</div>
+        <button class="btn btn-primary btn-lg btn-block" id="btnStartScanner" onclick="startScanner()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+            <circle cx="12" cy="13" r="4"></circle>
+          </svg>
+          <span>Buka Kamera</span>
+        </button>
       </div>
 
       <!-- Manual Input Alternative -->
@@ -2062,6 +2089,31 @@
     <div class="panel-sub" id="pilihSub">-</div>
     <div class="notif-list" id="pilihList"></div>
     <button class="btn btn-secondary" style="width: 100%;" onclick="tutupPilihProduk()">Batal</button>
+  </div>
+</div>
+
+<!-- Modal Kamera: hanya tampil saat kamera aktif, terpusat di tengah layar -->
+<div class="modal-overlay camera-modal" id="scannerModal" role="dialog" aria-modal="true" aria-label="Scanner kamera">
+  <div class="modal-box camera-modal-box">
+    <div class="scanner-modal-head">
+      <div class="modal-title">Scan Barcode / QR</div>
+      <button class="icon-btn" onclick="stopScanner()" aria-label="Tutup kamera">✕</button>
+    </div>
+    <div class="scanner-area" id="scannerArea">
+      <div class="scanner-preview" id="reader"></div>
+      <div class="scan-frame" id="scanFrame" aria-hidden="true">
+        <div class="scan-frame-corner tl"></div>
+        <div class="scan-frame-corner tr"></div>
+        <div class="scan-frame-corner bl"></div>
+        <div class="scan-frame-corner br"></div>
+        <div class="scan-line" id="scanLine"></div>
+      </div>
+      <div class="scanner-hint" id="scannerHint" style="display: none;">Arahkan kamera ke barcode / QR</div>
+      <div class="scanner-status" id="scannerStatus" style="display: none;"></div>
+    </div>
+    <div class="scanner-modal-foot">
+      <button class="btn btn-secondary btn-block" id="btnStopScanner" onclick="stopScanner()" style="display: none;" aria-label="Tutup kamera">✕ Tutup Kamera</button>
+    </div>
   </div>
 </div>
 
@@ -2624,9 +2676,6 @@
     if (status) status.innerText = "Memuat Master Produk...";
     if (indicator) indicator.className = 'status-indicator loading';
 
-    // Show skeleton loader in scanner area while loading
-    showScannerSkeleton(true);
-
     try {
       const res = await api('master');
       productLookupMap = {};
@@ -2648,35 +2697,6 @@
       if (handleAuthError(err)) return;
       if (status) status.innerText = "❌ Gagal memuat data master: " + err.message;
       if (indicator) indicator.className = 'status-indicator error';
-    } finally {
-      showScannerSkeleton(false);
-    }
-  }
-
-  function showScannerSkeleton(show) {
-    const scannerArea = document.getElementById('scannerArea');
-    const hint = document.getElementById('scannerHint');
-    const controls = scannerArea?.querySelector('.scanner-controls');
-
-    if (show) {
-      // Add skeleton overlay if not exists
-      if (!scannerArea.querySelector('.scanner-skeleton')) {
-        const skeleton = document.createElement('div');
-        skeleton.className = 'scanner-skeleton';
-        skeleton.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.4);z-index:15;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;pointer-events:none;';
-        skeleton.innerHTML = `
-          <div class="skeleton" style="width:60px;height:60px;border-radius:50%;"></div>
-          <div class="skeleton skeleton-text short" style="max-width:200px;"></div>
-        `;
-        scannerArea.insertBefore(skeleton, scannerArea.firstChild);
-      }
-      if (hint) hint.style.display = 'none';
-      if (controls) controls.style.display = 'none';
-    } else {
-      const skeleton = scannerArea?.querySelector('.scanner-skeleton');
-      if (skeleton) skeleton.remove();
-      if (hint) hint.style.display = 'block';
-      if (controls) controls.style.display = 'flex';
     }
   }
 
@@ -2865,12 +2885,18 @@
     btn.innerText = "Menyimpan...";
     btn.disabled = true;
 
+    // Kamera dimatikan selama proses simpan, lalu dinyalakan lagi setelah selesai
+    simpanBerjalan = true;
+    await matikanKameraSaatSimpan();
+
+    const mulaiSimpan = Date.now();
     const payload = { produk_id: item.produk_id, qty: qtyVal, kategori: produkModalKategori || null };
     try {
       const res = await api('simpan', payload);
+      const detik = ((Date.now() - mulaiSimpan) / 1000).toFixed(1).replace('.', ',');
       tutupProdukModal();
       pollNotif(true);
-      showModal("Berhasil Disimpan", `Tercatat (${peranAktif()}) +${qtyVal} Pcs ${item.nama_produk} di ${String(res.sheet || labelSheet()).toUpperCase()}. Total input ${peranAktif().toLowerCase()} untuk produk ini: ${res.total} Pcs.`);
+      showModal("Berhasil Disimpan", `Tercatat (${peranAktif()}) +${qtyVal} Pcs ${item.nama_produk} di ${String(res.sheet || labelSheet()).toUpperCase()}. Total input ${peranAktif().toLowerCase()} untuk produk ini: ${res.total} Pcs. (${detik} dtk)`);
       hapticFeedback('success');
     } catch (err) {
       if (handleAuthError(err)) return;
@@ -2896,6 +2922,7 @@
     } finally {
       btn.innerText = 'Simpan';
       btn.disabled = !aksesTerbuka;
+      await hidupkanKameraSetelahSimpan();
     }
   }
 
@@ -3034,6 +3061,9 @@
     btn.innerText = "Simpan...";
     btn.disabled = true;
 
+    simpanBerjalan = true;
+    await matikanKameraSaatSimpan();
+
     try {
       // Cabang, role, user, nama & harga ditentukan server dari sesi dan sheet Master
       const kode = String(activeItem.produk_id).trim();
@@ -3072,6 +3102,7 @@
       }
     } finally {
       terapkanAkses(aksesData);
+      await hidupkanKameraSetelahSimpan();
     }
   }
 
@@ -3301,6 +3332,9 @@
   let qrScanner = null;
   let isScanning = false;
   let lastScan = { code: '', time: 0 };
+  let simpanBerjalan = false;          // true selama proses simpan belum selesai
+  let kameraMenyala = false;           // true selama kamera sedang dinyalakan (cegah start ganda)
+  let kameraSesi = 0;                  // naik setiap kamera dihentikan, agar start yang terlambat tidak menyalakan kamera
 
   function cameraErrorMessage(err) {
     const name = (err && err.name) || '';
@@ -3338,6 +3372,8 @@
   }
 
   function onScanSuccess(decodedText) {
+    if (simpanBerjalan) return;                                                    // simpan sebelumnya belum selesai
+    if (document.getElementById('produkModal').style.display === 'flex') return;   // form input masih terbuka
     const now = Date.now();
     if (decodedText === lastScan.code && now - lastScan.time < 2000) return;
     lastScan = { code: decodedText, time: now };
@@ -3348,29 +3384,40 @@
   }
 
   function resumeScanner() {
+    if (simpanBerjalan) return;                    // kamera sengaja dimatikan selama menyimpan
     if (qrScanner && isScanning) {
       try { qrScanner.resume(); } catch (e) {}
     }
   }
 
-  async function startScanner() {
-    if (typeof Html5Qrcode === 'undefined')
-      return showModal("Scanner Belum Siap", "Library scanner belum termuat. Periksa koneksi internet lalu muat ulang halaman.");
-    if (isScanning) return resumeScanner();
+  // ---- Modal kamera: hanya tampil selama kamera aktif, terpusat di tengah layar ----
+  function scannerModalTerbuka() {
+    const m = document.getElementById('scannerModal');
+    return !!m && m.style.display === 'flex';
+  }
 
-    const hint = document.getElementById('scannerHint');
-    const controls = document.querySelector('.scanner-controls');
-    const startBtn = document.getElementById('btnStartScanner');
-    const stopBtn = document.getElementById('btnStopScanner');
+  function setScannerStatus(pesan) {
+    const el = document.getElementById('scannerStatus');
+    if (!el) return;
+    el.textContent = pesan || '';
+    el.style.display = pesan ? 'flex' : 'none';
+  }
+
+  // Nyalakan kamera di dalam modal (dipakai juga untuk menyalakan ulang setelah menyimpan)
+  async function mulaiKamera(jedaHematScan) {
+    if (kameraMenyala || isScanning) return;     // sudah menyala / sedang menyala
+    kameraMenyala = true;
+    const sesi = ++kameraSesi;
     const scanFrame = document.getElementById('scanFrame');
-
-    if (hint) hint.style.display = 'none';
-    if (controls) controls.style.display = 'flex';
-    if (startBtn) startBtn.style.display = 'none';
-    if (stopBtn) stopBtn.style.display = 'inline-flex';
-    if (scanFrame) scanFrame.style.display = 'block';
+    const stopBtn = document.getElementById('btnStopScanner');
     const readerEl = document.getElementById('reader');
+    const hint = document.getElementById('scannerHint');
+
+    if (scanFrame) scanFrame.style.display = 'block';
+    if (stopBtn) stopBtn.style.display = 'inline-flex';
+    if (hint) hint.style.display = 'block';
     if (readerEl) readerEl.style.display = 'block';
+    setScannerStatus('Menyalakan kamera...');
 
     try {
       if (!qrScanner) qrScanner = new Html5Qrcode("reader", scannerOptions());
@@ -3404,28 +3451,64 @@
       }
       // Fokus otomatis terus-menerus (didukung Chrome Android); diabaikan jika tidak tersedia
       try { await qrScanner.applyVideoConstraints({ advanced: [{ focusMode: "continuous" }] }); } catch (e) {}
+      // Modal sempat ditutup / kamera dimatikan saat start masih berjalan: jangan tinggalkan kamera menyala
+      if (sesi !== kameraSesi || !scannerModalTerbuka()) {
+        try { await qrScanner.stop(); } catch (e) {}
+        try { qrScanner.clear(); } catch (e) {}
+        qrScanner = null;
+        kameraMenyala = false;
+        if (scanFrame) scanFrame.style.display = 'none';
+        if (stopBtn) stopBtn.style.display = 'none';
+        if (readerEl) readerEl.style.display = 'none';
+        setScannerStatus('');
+        return;
+      }
       isScanning = true;
+      kameraMenyala = false;
+      setScannerStatus('');
+      // Nyala ulang setelah menyimpan: beri jeda singkat agar barcode yang sama tidak
+      // langsung ter-scan ulang tanpa sengaja.
+      if (jedaHematScan) {
+        try { qrScanner.pause(true); } catch (e) {}
+        setTimeout(() => { if (isScanning && qrScanner) { try { qrScanner.resume(); } catch (e) {} } }, 2000);
+      }
       hapticFeedback('medium');
     } catch (err) {
       isScanning = false;
-      if (hint) hint.style.display = 'block';
-      if (controls) controls.style.display = 'none';
-      if (startBtn) startBtn.style.display = 'inline-flex';
-      if (stopBtn) stopBtn.style.display = 'none';
+      kameraMenyala = false;
+      qrScanner = null;
       if (scanFrame) scanFrame.style.display = 'none';
-      const readerEl = document.getElementById('reader');
+      if (stopBtn) stopBtn.style.display = 'none';
       if (readerEl) readerEl.style.display = 'none';
+      setScannerStatus('');
+      tutupScannerModal();
       showModal("Kamera Tidak Bisa Dibuka", cameraErrorMessage(err));
       hapticFeedback('error');
     }
-  } // end startScanner
+  }
+
+  async function startScanner() {
+    if (typeof Html5Qrcode === 'undefined')
+      return showModal("Scanner Belum Siap", "Library scanner belum termuat. Periksa koneksi internet lalu muat ulang halaman.");
+    if (simpanBerjalan) return;                    // jangan buka kamera selagi simpan belum selesai
+    if (isScanning) { resumeScanner(); return; }
+
+    // Modal dibuka lebih dulu agar elemen video sudah punya ukuran layar saat kamera dinyalakan
+    openModal(document.getElementById('scannerModal'));
+    await mulaiKamera(false);
+  }
+
+  function tutupScannerModal() {
+    const m = document.getElementById('scannerModal');
+    if (m && m.style.display === 'flex') closeModal(m);
+  }
 
   async function stopScanner() {
+    kameraSesi++;
     const hint = document.getElementById('scannerHint');
-    const controls = document.querySelector('.scanner-controls');
-    const startBtn = document.getElementById('btnStartScanner');
     const stopBtn = document.getElementById('btnStopScanner');
     const scanFrame = document.getElementById('scanFrame');
+    const readerEl = document.getElementById('reader');
 
     try {
       if (qrScanner) {
@@ -3436,15 +3519,34 @@
     qrScanner = null;
     isScanning = false;
 
-    if (hint) hint.style.display = 'block';
-    if (controls) controls.style.display = 'none';
-    if (startBtn) startBtn.style.display = 'inline-flex';
+    if (hint) hint.style.display = 'none';
     if (stopBtn) stopBtn.style.display = 'none';
     if (scanFrame) scanFrame.style.display = 'none';
+    if (readerEl) readerEl.style.display = 'none';
+    setScannerStatus('');
+
+    tutupScannerModal();
+    hapticFeedback('light');
+  }
+
+  // Dipanggil saat menyimpan: kamera dimatikan total (hemat baterai, tidak ada scan tak sengaja)
+  async function matikanKameraSaatSimpan() {
+    if (!qrScanner || !isScanning) return;
+    kameraSesi++;
+    setScannerStatus('Menyimpan data... kamera dimatikan sementara.');
+    try { await qrScanner.stop(); } catch (e) {}
+    try { qrScanner.clear(); } catch (e) {}
+    qrScanner = null;
+    isScanning = false;
     const readerEl = document.getElementById('reader');
     if (readerEl) readerEl.style.display = 'none';
+  }
 
-    hapticFeedback('light');
+  // Dipanggil setelah simpan selesai (berhasil/gagal): kamera dinyalakan lagi bila modalnya masih terbuka
+  async function hidupkanKameraSetelahSimpan() {
+    simpanBerjalan = false;
+    if (!scannerModalTerbuka()) return;
+    await mulaiKamera(true);
   }
 
   async function scanFromPhoto(input) {
@@ -3523,7 +3625,7 @@
     notif = { count: 0, items: [], menunggu: 0, updated: null };
     notifSeen = false;
     reconItem = null;
-    ['notifPanel', 'reconModal', 'confirmModal', 'pilihModal', 'jadwalModal', 'rekapModal', 'tambahProdukModal', 'konfirmUmumModal', 'sndModal', 'qrModal'].forEach(id => document.getElementById(id).style.display = 'none');
+    ['notifPanel', 'reconModal', 'confirmModal', 'pilihModal', 'jadwalModal', 'rekapModal', 'tambahProdukModal', 'konfirmUmumModal', 'sndModal', 'qrModal', 'scannerModal', 'produkModal'].forEach(id => document.getElementById(id).style.display = 'none');
     const bell = document.getElementById('btnBell');
     bell.style.display = 'none';
     bell.classList.remove('has-alert', 'ring');

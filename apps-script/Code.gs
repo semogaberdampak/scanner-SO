@@ -34,6 +34,7 @@ var FORMAT_WAKTU = 'dd/MM/yyyy HH:mm:ss';
 var WARNA_AWAL = '#FCE4D6';   // baris input awal yang selisih (oranye muda)
 var WARNA_REKON = '#E2EFDA';  // baris rekonsiliasi (hijau muda)
 var NOTIF_CACHE_DETIK = 60;
+var MASTER_CACHE_DETIK = 180;     // cache singkat data Master per produk agar simpan tidak selalu membaca sheet Master
 var SHEET_UJI = 'tes_input';        // sheet khusus uji coba admin (semua fitur, tanpa jadwal)
 var TZ_AKSES = 'Asia/Jakarta';     // "hari ini" untuk jadwal input mengikuti WIB
 var MAKS_TANGGAL = 400;            // batas jumlah tanggal per cabang
@@ -50,10 +51,18 @@ function cekFormatSheet_(sheet) {
                   HEADER.join(', ') + '. Kosongkan data uji lama di sheet itu lalu coba lagi.');
 }
 
-// Ambil sheet cabang; buat judul jika kosong; pastikan kolom H "keterangan" ada
+// Ambil sheet cabang; buat judul jika kosong; pastikan kolom H "keterangan" ada.
+// Pemeriksaan judul di-cache sebentar: dulu setiap simpan menambah 3-4 panggilan Spreadsheet.
 function siapkanSheet_(ss, nama) {
   var sheet = ss.getSheetByName(nama);
-  if (!sheet) sheet = ss.insertSheet(nama);
+  if (!sheet) {
+    sheet = ss.insertSheet(nama);
+    sheet.appendRow(HEADER);
+    return sheet;
+  }
+  var cache = CacheService.getScriptCache();
+  var kunci = 'siap|' + nama;
+  if (cache.get(kunci)) return sheet;
   if (!cekFormatSheet_(sheet)) {
     sheet.appendRow(HEADER);
   } else {
@@ -63,7 +72,26 @@ function siapkanSheet_(ss, nama) {
     var kat = String(sheet.getRange(1, COL_KAT).getValue()).trim();
     if (!kat) sheet.getRange(1, COL_KAT).setValue(HEADER_KAT);
   }
+  try { cache.put(kunci, '1', 6 * 60 * 60); } catch (e) {}
   return sheet;
+}
+
+// Data produk dari sheet Master (kode, nama, harga), di-cache singkat per produk.
+// Tanpa cache, setiap simpan melakukan TextFinder seluruh kolom A + getValues ke sheet Master.
+function masterProduk_(kode) {
+  var kodeStr = String(kode);
+  var cache = CacheService.getScriptCache();
+  var kunci = 'mp|' + kodeStr;
+  var raw = cache.get(kunci);
+  if (raw) { try { return JSON.parse(raw); } catch (e) {} }
+  var master = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Master');
+  if (!master) return null;
+  var mf = master.getRange('A:A').createTextFinder(kodeStr).matchEntireCell(true).findNext();
+  if (!mf) return null;
+  var m = master.getRange(mf.getRow(), 1, 1, 4).getValues()[0];
+  var out = { kode: String(m[0]).trim(), nama: m[2], harga: m[3] };
+  try { cache.put(kunci, JSON.stringify(out), MASTER_CACHE_DETIK); } catch (e) {}
+  return out;
 }
 
 // Baris "aktif" sebuah produk = baris TERAKHIR yang memuat kode itu (baris di atasnya = riwayat)
@@ -384,46 +412,49 @@ function simpan_(user, b) {
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
+    // Nama & harga diambil dari sheet Master (bukan dari klien); dibaca sekali lalu di-cache
+    var m = masterProduk_(b.produk_id);
+    if (!m) return { ok: false, error: 'Produk tidak ditemukan di Master.' };
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-    // Nama & harga diambil dari sheet Master (bukan dari klien)
-    var master = ss.getSheetByName('Master');
-    if (!master) return { ok: false, error: 'Sheet Master tidak ditemukan.' };
-    var mf = master.getRange('A:A').createTextFinder(String(b.produk_id)).matchEntireCell(true).findNext();
-    if (!mf) return { ok: false, error: 'Produk tidak ditemukan di Master.' };
-    var m = master.getRange(mf.getRow(), 1, 1, 4).getValues()[0];
-
     var sheet = siapkanSheet_(ss, user.cabang);
     var kolom = user.role === 'KASIR' ? COL_KASIR : COL_VERIFIKATOR;
     var now = new Date();
-    var kode = String(m[0]).trim();
+    var kode = m.kode;
     var total;
     var kategori = String(b.kategori || '').trim().toUpperCase();
 
     var row = barisAktif_(sheet, kode);
     if (row) {
+      // Satu kali baca untuk seluruh baris aktif (tidak lagi 1 panggilan per sel)
+      var cur = sheet.getRange(row, 1, 1, COL_KAT).getValues()[0];
       // Jika baris aktif adalah hasil rekonsiliasi, JANGAN diubah (jejak audit). Buat baris "LANJUTAN" di bawahnya.
-      if (String(sheet.getRange(row, COL_KET).getValue()).indexOf('REKONSILIASI') === 0) {
-        var cur = sheet.getRange(row, 1, 1, 9).getValues()[0];
+      if (String(cur[COL_KET - 1]).indexOf('REKONSILIASI') === 0) {
         sheet.insertRowAfter(row);
         row = row + 1;
-        var rg = sheet.getRange(row, 1, 1, COL_KET);
-        rg.setBackground(null);
-        rg.setValues([cur.concat(['LANJUTAN'])]);
+        cur = cur.slice();
+        cur[COL_KET - 1] = 'LANJUTAN';
+        sheet.getRange(row, 1, 1, COL_KAT).setBackground(null);
         sheet.getRange(row, 1).setNumberFormat('@');
       }
-      total = (Number(sheet.getRange(row, kolom).getValue()) || 0) + qty;
-      sheet.getRange(row, kolom, 1, 2).setValues([[total, now]]);
-      if (kategori) sheet.getRange(row, COL_KAT).setValue(kategori);
+      total = (Number(cur[kolom - 1]) || 0) + qty;
+      cur[kolom - 1] = total;
+      cur[kolom] = now;
+      if (kategori) cur[COL_KAT - 1] = kategori;
+      sheet.getRange(row, 1, 1, COL_KAT).setValues([cur]);
       sheet.getRange(row, kolom + 1).setNumberFormat(FORMAT_WAKTU);
     } else {
       var baru = sheet.getLastRow() + 1;
-      sheet.getRange(baru, 1).setNumberFormat('@');
-      var data = [kode, m[2], m[3], '', '', '', '', '', kategori];
+      var data = [kode, m.nama, m.harga, '', '', '', '', '', kategori];
       data[kolom - 1] = qty;
       data[kolom] = now;
       sheet.getRange(baru, 1, 1, HEADER.length).setValues([data]);
-      sheet.getRange(baru, kolom + 1).setNumberFormat(FORMAT_WAKTU);
+      // Format kode sebagai teks + format waktu, dalam satu panggilan
+      var fmt = [];
+      for (var fi = 0; fi < HEADER.length; fi++) fmt.push('general');
+      fmt[0] = '@';
+      fmt[kolom] = FORMAT_WAKTU;
+      sheet.getRange(baru, 1, 1, HEADER.length).setNumberFormats([fmt]);
       total = qty;
     }
 
